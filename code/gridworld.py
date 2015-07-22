@@ -63,7 +63,7 @@ class Grid(environment.Environment):
 
     def _out_of_bounds(self, state):
         return state[0] < 0 or state[0] >= self.grid.shape[0] or state[1] < 0 \
-            or state[1] >= self.grid.shape[1]
+            or state[1] >= self.grid.shape[1] or self.grid[state[0], state[1]]
 
     def perform_action(self, action):
         if random.random() < self.action_stochasticity:
@@ -71,8 +71,6 @@ class Grid(environment.Environment):
         else:
             tmp = self._move(self.curr_state, self.actions[action])
         if self._out_of_bounds(tmp):
-            self.hit_wall = True
-        elif self.grid[tmp[0], tmp[1]]:
             self.hit_wall = True
         else:
             self.hit_wall = False
@@ -84,11 +82,18 @@ class Grid(environment.Environment):
         self.hit_wall = False
         self.curr_state = random.choice(self.free_pos)
 
+    def _next_state(self, state, action):
+        ns = self._move(state, action)
+        if self._out_of_bounds(ns):
+            return state
+
+        return ns
+
     def next_state_distribution(self, state, action):
         next = {}
-        next[self._move(state, self.actions[action])] = 1. - self.action_stoch
+        next[self._next_state(state, self.actions[action])] = 1. - self.action_stoch
         for act in self.actions:
-            ns = self._move(state, act)
+            ns = self._next_state(state, act)
             if ns in next:
                 next[ns] += self.action_stoch
             else:
@@ -126,19 +131,20 @@ class GridWorldMDP(environment.MDP):
 class GridWorld(environment.Task):
     ''' RL variant of gridworld where the dynamics and reward function are not
         fully observed'''
-    def __init__(self, grid, rewards, wall_penalty):
+    def __init__(self, grid, rewards, wall_penalty, gamma):
         ''' Assumes grid has already been initialized. Rewards is a map of
             (x, y)-coordinates and the reward for reaching that point'''
         self.wall_penalty = wall_penalty
         self.rewards = rewards
         self.env = grid
+        self.gamma = gamma
 
     def get_reward(self, state, action, next_state):
         # returns the reward based on the (s, a, s') triple
         if (state == next_state):
             return self.wall_penalty
-        
+
         if (self.env.state_pos[next_state] in self.rewards):
             return self.rewards[next_state]
-        
+
         return 0
