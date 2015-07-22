@@ -31,6 +31,7 @@ class Grid(environment.Environment):
     def _free_pos(self):
         pos = []
         self.state_id = {}
+        self.state_pos = {}
         state_num = 0
         w, h = self.grid.shape
         for i in xrange(w):
@@ -38,6 +39,7 @@ class Grid(environment.Environment):
                 if self.grid[i][j] == 0.:
                     pos.append((i, j))
                     self.state_id[(i, j)] = state_num
+                    self.state_pos[state_num] = (i, j)
                     state_num += 1
         return pos
 
@@ -53,19 +55,22 @@ class Grid(environment.Environment):
     def get_allowed_actions(self, state):
         return range(len(self.actions))
 
-    def get_starting_state(self):
+    def get_current_state(self):
         return self.state_id[self.curr_state]
 
-    def _move(self, act):
-        return (self.curr_state[0] + act[0], self.curr_state[1] + act[1])
+    def _move(self, state, act):
+        return (state[0] + act[0], state[1] + act[1])
+
+    def _out_of_bounds(self, state):
+        return state[0] < 0 or state[0] >= self.grid.shape[0] or state[1] < 0 \
+            or state[1] >= self.grid.shape[1]
 
     def perform_action(self, action):
         if random.random() < self.action_stochasticity:
-            tmp = self._move(random.choice(self.actions))
+            tmp = self._move(self.curr_state, random.choice(self.actions))
         else:
-            tmp = self._move(self.actions[action])
-        if tmp[0] < 0 or tmp[0] >= self.grid.shape[0] or tmp[1] < 0 \
-                or tmp[1] >= self.grid.shape[1]:
+            tmp = self._move(self.curr_state, self.actions[action])
+        if self._out_of_bounds(tmp):
             self.hit_wall = True
         elif self.grid[tmp[0], tmp[1]]:
             self.hit_wall = True
@@ -79,14 +84,69 @@ class Grid(environment.Environment):
         self.hit_wall = False
         self.curr_state = random.choice(self.free_pos)
 
+    def next_state_distribution(self, state, action):
+        next = {}
+        next[self._move(state, self.actions[action])] = 1. - self.action_stoch
+        for act in self.actions:
+            ns = self._move(state, act)
+            if ns in next:
+                next[ns] += self.action_stoch
+            else:
+                next[ns] = self.action_stoch
+
+        return next.items()
+
 
 class GridWorldMDP(environment.MDP):
     ''' Classic gridworld cast as a Markov Decision Process. In particular,
         exports the reward function and the state-transition function'''
-    # TODO: IMPLEMENT ME
+
+    def __init__(self, grid, rewards, wall_penalty):
+        ''' Assumes grid has already been initialized. Rewards is a map of
+            (x, y)-coordinates and the reward for reaching that point'''
+        self.wall_penalty = wall_penalty
+        self.rewards = rewards
+        self.grid = grid
+
+    def next_state_distribution(self, state, action):
+        return self.grid.next_state_distribtion(state, action)
+
+    def get_reward(self, state, action, next_state):
+        # returns the reward based on the (s, a, s') triple
+        if (state == next_state):
+            return self.wall_penalty
+        elif (self.grid.state_pos[next_state] in self.rewards):
+            return self.rewards[next_state]
+        else:
+            return 0
 
 
 class GridWorld(environment.Task):
     ''' RL variant of gridworld where the dynamics and reward function are not
         fully observed'''
-    # TODO: IMPLEMENT ME
+    def __init__(self, grid, rewards, wall_penalty):
+        ''' Assumes grid has already been initialized. Rewards is a map of
+            (x, y)-coordinates and the reward for reaching that point'''
+        self.wall_penalty = wall_penalty
+        self.rewards = rewards
+        self.grid = grid
+
+    def get_reward(self, state):
+        if self.grid.hit_wall:
+            return self.wall_penalty
+
+        if self.grid.state_pos[state] in self.rewards:
+            return self.rewards[self.grid.curr_state]
+        else:
+            return 0
+
+    def perform_action(self, action):
+        next_state = self.grid.perform_action(action)
+        reward = self.get_reward(next_state)
+        return (next_state, reward)
+
+    def reset(self):
+        self.grid.reset()
+
+    def get_current_state(self):
+        return self.grid.get_current_state()
