@@ -9,7 +9,7 @@ class Environment(object):
         # network function approximator
         raise NotImplementedError()
 
-    def get_max_allowed_actions(self):
+    def get_num_actions(self):
         # returns the cardinality of the action set
         raise NotImplementedError()
 
