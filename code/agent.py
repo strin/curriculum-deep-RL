@@ -1,3 +1,6 @@
+import numpy as np
+
+
 class OnlineAgent(object):
 
     def get_action(self, state):
@@ -7,26 +10,67 @@ class OnlineAgent(object):
         raise NotImplementedError()
 
 
-class MDPSolver(object):
+class ValueIterationSolver(OnlineAgent):
 
-    def get_policy(self, state):
-        raise NotImplementedError()
+    def __init__(self, mdp, tol=1e-3):
+        self.mdp = mdp
+        self.num_states = mdp.get_num_states()
+        self.gamma = mdp.gamma
+        self.tol = tol
 
-    def solve_mdp(self):
-        raise NotImplementedError()
+        # Tabular representation of state-value function initialized uniformly
+        self.V = [(1. / self.num_states) for s in xrange(self.num_states)]
 
+    def get_action(self, state):
+        '''Returns the greedy action with respect to the current policy'''
+        poss_actions = self.mdp.get_allowed_actions(state)
 
-class ValueIterationSolver(MDPSolver):
+        # compute a^* = \argmax_{a} Q(s, a)
+        best_action = None
+        best_val = -float('inf')
+        for action in poss_actions:
+            ns_dist = self.mdp.next_state_distribution(state, action)
 
-    def __init__(self, options, mdp):
-        pass
+            val = 0.
+            for ns, prob in ns_dist:
+                val += prob * self.gamma * self.V[ns]
 
-    def get_policy(self, state):
-        pass
+            if val > best_val:
+                best_action = action
+                best_val = val
 
-    def solve_mdp(self):
+        return best_action
+
+    def learn(self):
         ''' Performs value iteration on the MDP until convergence '''
-        pass
+        while True:
+            # repeatedly perform the Bellman backup on each state
+            # V_{i+1}(s) = \max_{a} \sum_{s' \in NS} T(s, a, s')[R(s, a, s') + \gamma V(s')]
+            max_diff = 0.
+            for state in xrange(self.num_states):
+                poss_actions = self.mdp.get_allowed_actions(state)
+                if len(poss_actions) == 0:
+                    self.V[state] = 0.
+
+                best_val = -float('inf')
+                for action in poss_actions:
+                    val = 0.
+                    ns_dist = self.mdp.next_state_distribution(state, action)
+                    for ns, prob in ns_dist:
+                        val += prob * (self.mdp.get_reward(state, action, ns) +
+                                       self.gamma * self.V[ns])
+
+                    if val > best_val:
+                        best_val = val
+
+                diff = abs(self.V[state] - best_val)
+                self.V[state] = best_val
+
+                if diff > max_diff:
+                    max_diff = diff
+
+            if max_diff < self.tol:
+                break
 
 
 class TdLearner(OnlineAgent):
