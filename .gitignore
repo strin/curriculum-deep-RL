@@ -1,0 +1,2 @@
+# ignore compiled object files
+*.pyc
