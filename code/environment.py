@@ -4,7 +4,7 @@ class Environment(object):
         # returns the number of state for a tabular representation
         raise NotImplementedError()
 
-    def get_state_dimension(self):
+    def ti(self):
         # returns the dimension of each observation for use with a neural
         # network function approximator
         raise NotImplementedError()
@@ -46,9 +46,6 @@ class MDP(object):
     def get_num_states(self):
         return self.env.get_num_states()
 
-    def get_state_dimension(self):
-        return self.env.get_state_dimension()
-
     def get_num_actions(self):
         return self.env.get_num_actions()
 
@@ -61,11 +58,12 @@ class MDP(object):
     def perform_action(self, action):
         return self.env.perform_action(action)
 
-    def reset(self):
-        self.env.reset()
-
     def get_gamma(self):
         return self.gamma
+
+    def is_terminal(self, state):
+        # returns true if the state is a terminal state
+        raise NotImplementedError()
 
     def next_state_distribution(self, state, action):
         # returns a list of (next_state, probability) pairs based in s, a
@@ -74,6 +72,13 @@ class MDP(object):
     def get_reward(self, state, action, next_state):
         # returns the reward based on the (s, a, s') triple
         raise NotImplementedError()
+
+
+class Observation(object):
+    def __init__(self, reward, next_state, reset):
+        self.reward = reward
+        self.next_state = next_state
+        self.reset = reset
 
 
 class Task(object):
@@ -99,17 +104,26 @@ class Task(object):
     def get_current_state(self):
         return self.env.get_current_state()
 
-    def reset(self):
-        self.env.reset()
-
     def get_gamma(self):
         return self.gamma()
+
+    def is_terminal(self):
+        # Is the environment in a terminal state, i.e. are there no possible
+        # successors
+        state = self.get_current_state()
+        poss_actions = self.get_allowed_actions(state)
+        return len(poss_actions) == 0
+
+    def perform_action(self, action):
+        curr_state = self.env.get_current_state()
+        next_state = self.env.perform_action(action)
+        reward = self.get_reward(curr_state, action, next_state)
+        return (next_state, reward)
+
+    def reset(self):
+        # resets the current state to the starting state
+        raise NotImplementedError()
 
     def get_reward(self, state, action, next_state):
         # returns the reward based on the (s, a, s') triple
         raise NotImplementedError()
-
-    def perform_action(self, action):
-        next_state = self.env.perform_action(action)
-        reward = self.get_reward(next_state)
-        return (next_state, reward)

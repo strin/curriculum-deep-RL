@@ -66,7 +66,7 @@ class Grid(environment.Environment):
             or state[1] >= self.grid.shape[1] or self.grid[state[0], state[1]]
 
     def perform_action(self, action):
-        if random.random() < self.action_stochasticity:
+        if random.random() < self.action_stoch:
             tmp = self._move(self.curr_state, random.choice(self.actions))
         else:
             tmp = self._move(self.curr_state, self.actions[action])
@@ -136,7 +136,12 @@ class GridWorldMDP(environment.MDP):
 
 class GridWorld(environment.Task):
     ''' RL variant of gridworld where the dynamics and reward function are not
-        fully observed'''
+        fully observed
+
+        Currently, this task is episodic. If an agent reaches one of the
+        reward states, it receives the reward and is reset to a new starting
+        location.
+        '''
     def __init__(self, grid, rewards, wall_penalty, gamma):
         ''' Assumes grid has already been initialized. Rewards is a map of
             (x, y)-coordinates and the reward for reaching that point'''
@@ -144,6 +149,17 @@ class GridWorld(environment.Task):
         self.rewards = rewards
         self.env = grid
         self.gamma = gamma
+        self.reset()
+
+    def reset(self):
+        while(self.env.state_pos[self.get_current_state()] in self.rewards):
+            self.env.reset()
+
+    def get_allowed_actions(self, state):
+        if (self.env.state_pos[state] in self.rewards):
+            return []
+        else:
+            return self.env.get_allowed_actions(state)
 
     def get_reward(self, state, action, next_state):
         # returns the reward based on the (s, a, s') triple
@@ -151,6 +167,6 @@ class GridWorld(environment.Task):
             return self.wall_penalty
 
         if (self.env.state_pos[next_state] in self.rewards):
-            return self.rewards[next_state]
+            return self.rewards[self.env.state_pos[next_state]]
 
-        return 0
+        return 0.  # no reward
