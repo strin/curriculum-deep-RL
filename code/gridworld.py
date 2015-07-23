@@ -85,9 +85,9 @@ class Grid(environment.Environment):
     def _next_state(self, state, action):
         ns = self._move(state, action)
         if self._out_of_bounds(ns):
-            return state
+            return self.state_id[state]
 
-        return ns
+        return self.state_id[ns]
 
     def next_state_distribution(self, state, action):
         next = {}
@@ -95,9 +95,9 @@ class Grid(environment.Environment):
         for act in self.actions:
             ns = self._next_state(state, act)
             if ns in next:
-                next[ns] += self.action_stoch
+                next[ns] += self.action_stoch / float(len(self.actions))
             else:
-                next[ns] = self.action_stoch
+                next[ns] = self.action_stoch / float(len(self.actions))
 
         return next.items()
 
@@ -114,18 +114,24 @@ class GridWorldMDP(environment.MDP):
         self.env = grid
         self.gamma = gamma
 
+    def get_allowed_actions(self, state):
+        if (self.env.state_pos[state] in self.rewards):
+            return []
+        else:
+            return self.env.get_allowed_actions(state)
+
     def get_reward(self, state, action, next_state):
         # returns the reward based on the (s, a, s') triple
         if (state == next_state):
             return self.wall_penalty
 
         if (self.env.state_pos[next_state] in self.rewards):
-            return self.rewards[next_state]
+            return self.rewards[self.env.state_pos[next_state]]
 
         return 0
 
     def next_state_distribution(self, state, action):
-        return self.env.next_state_distribution(state, action)
+        return self.env.next_state_distribution(self.env.state_pos[state], action)
 
 
 class GridWorld(environment.Task):
