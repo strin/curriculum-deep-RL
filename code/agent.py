@@ -1,5 +1,7 @@
 import random
 import numpy as np
+import theano
+import theano.tensor as T
 
 
 class OnlineAgent(object):
@@ -47,7 +49,10 @@ class ValueIterationSolver(OnlineAgent):
 
     def learn(self):
         ''' Performs value iteration on the MDP until convergence '''
+        iter_num = 0
         while True:
+            print 'iteration', iter_num
+            iter_num += 1
             # repeatedly perform the Bellman backup on each state
             # V_{i+1}(s) = \max_{a} \sum_{s' \in NS} T(s, a, s')[R(s, a, s') + \gamma V(s')]
             max_diff = 0.
@@ -59,6 +64,7 @@ class ValueIterationSolver(OnlineAgent):
                 # terminal state
                 if len(poss_actions) == 0:
                     self.V[state] = 0.
+                    continue
 
                 best_val = -float('inf')
                 for action in poss_actions:
@@ -137,7 +143,7 @@ class TdLearner(OnlineAgent):
         return action
 
     def learn(self, reward):
-        if(self.s0 is not None):
+        if(self.r is not None):
             if self.update == 'q_learning':
                 next_action = self._greedy_action(self.s1)
             elif self.update == 'sarsa':
@@ -159,16 +165,87 @@ class TdLearner(OnlineAgent):
 
 
 class DQN(OnlineAgent):
-    ''' Q-learning with a neural network function approximator '''
+    ''' Q-learning with a neural network function approximator
 
-    def __init__(self, options, task):
-        pass
+        TODO: Clean up the neural net code (make it more modular)
+              Incorporate the online optimizer
+                    - Tuning learning rates
+                    - Regularization
+                    - Gradient clipping (this is important for RL applications)
+    '''
+
+    def __init__(self, task, options, lr=1e-1):
+        self.task = task
+        self.state_dim = task.get_state_dimension()
+        self.num_actions = task.get_num_actions()
+        self.gamma = task.gamma
+
+        # set-up the neural network. Simple 2-layer network for now
+        self.dim_hidden = (self.state_dim + self.num_actions) / 2.
+
+        # declare symbolic variables
+        target = T.scalar('target')  # r + \gamma * \max_{a} Q(s, a)
+        s = T.vector('s')
+        a = T.scalar('a')
+        W1 = theano.shared(0.1 * np.random.rand(self.dim_hidden, self.state_dim), name='W1')
+        b1 = theano.shared(0.1 * np.random.rand(self.dim_hidden), name='b1')
+        W2 = theano.shared(0.1 * np.random.rand(self.num_actions, self.dim_hidden), name='W2')
+        b2 = theano.shared(0.1 * np.random.rand(self.num_actions), name='b2')
+
+        # Construct expression graph
+        layer1 = T.nnet.relu(W1.dot(s) + b1)
+        q_vals = T.nnet.softmax(W2.dot(layer1) + b2)
+        cost = (target - q_vals[a])**2
+
+        params = [W1, b1, W2, b2]
+
+        grads = T.grad(cost, params)
+
+        print "Compiling fprop"
+        self.fprop = theano.function(inputs=[s], outputs=[q_vals],
+                                     name='fprop')
+
+        print "Compiling bprop"
+        updates = [(param_i, param_i - lr * gparam_i)
+                   for param_i, gparam_i in zip(params, grads)]
+        self.bprop = theano.function([s, a, target], updates=updates)
+
+        # used for streaming updates
+        self.s0 = None
+        self.a0 = None
+        self.r = None
+        self.ns = None
+
+    def _greedy_action(self, state):
+        ''' a^* = argmax_{a} Q(s, a) '''
+        q_vals = self.fprop(state)
+        return q_vals.index(max(q_vals))
 
     def get_action(self, state):
-        pass
+        # epsilon greedy w.r.t the current policy
+        if(random.random() < self.epsilon):
+            action = random.randint(0, self.num_actions)
+        else:
+            action = self._greedy_action(state)
+
+        self.s0 = self.ns
+        self.a0 = self.na
+        self.ns = state
+
+        return action
 
     def learn(self, reward):
-        pass
+        if(self.r is not None):
+            # max_{a'} Q(ns, a')
+            next_qsa = np.max(self.fprop(self.ns))
+            target = self.r + self.gamma * next_qsa
+
+            # gradient descent on target - Q(s, a)
+            self.bprop(self.s0, self.a0, target)
+
+            # TODO: add experience replay mechanism here
+
+        self.r = reward
 
 
 class ReinforceAgent(OnlineAgent):
