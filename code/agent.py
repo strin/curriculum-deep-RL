@@ -2,6 +2,7 @@ import random
 import numpy as np
 import theano
 import theano.tensor as T
+import layers
 
 
 class OnlineAgent(object):
@@ -109,7 +110,7 @@ class TDLearner(OnlineAgent):
         self.update = update
 
         # Tabular representation of the Q-function initialized uniformly
-        self.Q = [[1. for a in task.get_allowed_actions(s)] for s in xrange(self.num_states)]
+        self.Q = [[0.5 for a in task.get_allowed_actions(s)] for s in xrange(self.num_states)]
 
         # used for streaming updates
         self.last_state = None
@@ -168,54 +169,75 @@ class TDLearner(OnlineAgent):
 class DQN(OnlineAgent):
     ''' Q-learning with a neural network function approximator
 
-        TODO: Clean up the neural net code (make it more modular)
-              Incorporate the online optimizer
+        TODO:       - Add experience replay
+                            - This will speed up the model since we can
+                               batch updates together for the forward
+                               and backward passes
+                                - Also, if we don't clone the next, then there
+                                  is no need to 2 do separate passes
+                    - Incorporate the online optimizer
                     - Tuning learning rates
                     - Regularization
                     - Gradient clipping (this is important for RL applications)
     '''
 
-    def __init__(self, task, options, lr=1e-1):
+    def __init__(self, task, options, hidden_dim=100, l2_reg=0.0, lr=1e-1):
         self.task = task
         self.state_dim = task.get_state_dimension()
         self.num_actions = task.get_num_actions()
         self.gamma = task.gamma
+        self.hidden_dim = hidden_dim
+        self.l2_reg = l2_reg
+        self.lr = lr
 
-        # set-up the neural network. Simple 2-layer network for now
-        self.dim_hidden = (self.state_dim + self.num_actions) / 2.
+        self._initialize_net()
 
-        # declare symbolic variables
-        target = T.scalar('target')  # r + \gamma * \max_{a} Q(s, a)
-        s = T.vector('s')
-        a = T.scalar('a')
-        W1 = theano.shared(0.1 * np.random.rand(self.dim_hidden, self.state_dim), name='W1')
-        b1 = theano.shared(0.1 * np.random.rand(self.dim_hidden), name='b1')
-        W2 = theano.shared(0.1 * np.random.rand(self.num_actions, self.dim_hidden), name='W2')
-        b2 = theano.shared(0.1 * np.random.rand(self.num_actions), name='b2')
+        # used for streaming updates
+        self.last_state = None
+        self.last_action = None
 
-        # Construct expression graph
-        layer1 = T.nnet.relu(W1.dot(s) + b1)
-        q_vals = T.nnet.softmax(W2.dot(layer1) + b2)
-        cost = (target - q_vals[a])**2
+    def _initialize_net(self):
+        # simple 2 layer net with l2-loss
+        state = T.vector('state')
+        hidden_layer = layers.FullyConnected(inputs=state,
+                                             input_dim=self.state_dim,
+                                             output_dim=self.hidden_dim,
+                                             activation=T.nnet.relu)
 
-        params = [W1, b1, W2, b2]
+        linear_layer = layers.FullyConnected(inputs=hidden_layer.output,
+                                             input_dim=self.hidden_dim,
+                                             output_dim=self.num_actions,
+                                             activation=None)
+
+        action_values = linear_layer.output
+
+        target = T.scalar('target')
+        last_action = T.scalar('action')
+        MSE = layers.MSE(action_values[last_action], target)
+
+        params = [hidden_layer.params, linear_layer.params]
+
+        l2_penalty = 0.
+        for param in params:
+            l2_penalty += (param ** 2).sum()
+        cost = MSE + self.l2_reg * l2_penalty
 
         grads = T.grad(cost, params)
 
-        print "Compiling fprop"
-        self.fprop = theano.function(inputs=[s], outputs=[q_vals],
+        # vanilla SGD update
+        updates = [(param, param - self.lr * gparam) for param, gparam
+                   in zip(params, grads)]
+
+        self.fprop = theano.function(inputs=[state], outputs=[action_values],
                                      name='fprop')
 
-        print "Compiling bprop"
-        updates = [(param_i, param_i - lr * gparam_i)
-                   for param_i, gparam_i in zip(params, grads)]
-        self.bprop = theano.function([s, a, target], updates=updates)
+        # takes a single gradient step
+        self.bprop = theano.function(inputs=[state, last_action, target],
+                                     outputs=[cost], updates=updates)
 
-        # used for streaming updates
-        self.s0 = None
-        self.a0 = None
-        self.r = None
-        self.ns = None
+    def reset_episode(self):
+        self.last_state = None
+        self.last_action = None
 
     def _greedy_action(self, state):
         ''' a^* = argmax_{a} Q(s, a) '''
@@ -229,24 +251,20 @@ class DQN(OnlineAgent):
         else:
             action = self._greedy_action(state)
 
-        self.s0 = self.ns
-        self.a0 = self.na
-        self.ns = state
+        self.last_state = state
+        self.last_action = action
 
         return action
 
-    def learn(self, reward):
-        if(self.r is not None):
-            # max_{a'} Q(ns, a')
-            next_qsa = np.max(self.fprop(self.ns))
-            target = self.r + self.gamma * next_qsa
+    def learn(self, next_state, reward):
+        # max_{a'} Q(ns, a')
+        next_qsa = np.max(self.fprop(next_state))
+        target = reward + self.gamma * next_qsa
 
-            # gradient descent on target - Q(s, a)
-            self.bprop(self.s0, self.a0, target)
+        # gradient descent on target - Q(s, a)
+        self.bprop(self.last_state, self.last_action, target)
 
-            # TODO: add experience replay mechanism here
-
-        self.r = reward
+        # TODO: add experience replay mechanism here
 
 
 class ReinforceAgent(OnlineAgent):
