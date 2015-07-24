@@ -3,7 +3,7 @@ import theano
 import theano.tensor as T
 
 
-class FullyConnectedLayer(object):
+class FullyConnected(object):
     def __init__(self, inputs, input_dim, output_dim, activation=T.nnet.relu):
         '''
             TODO: choice of initialization
@@ -32,9 +32,9 @@ class FullyConnectedLayer(object):
 
         # set-up the outputs
         if activation is None:
-            self.outputs = W.dot(inputs) + b
+            self.output = W.dot(inputs) + b
         else:
-            self.outputs = activation(W.dot(inputs) + b)
+            self.output = activation(W.dot(inputs) + b)
 
         # store parameters
         self.W = W
@@ -42,7 +42,7 @@ class FullyConnectedLayer(object):
         self.params = [self.W, self.b]
 
 
-class MSELayer(object):
+class MSE(object):
     def __init__(self, inputs, targets):
         '''
             Computes the MSE between inputs and targets
