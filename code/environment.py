@@ -74,13 +74,6 @@ class MDP(object):
         raise NotImplementedError()
 
 
-class Observation(object):
-    def __init__(self, reward, next_state, reset):
-        self.reward = reward
-        self.next_state = next_state
-        self.reset = reset
-
-
 class Task(object):
     ''' A task associates a reward function with an environment. The
         task mediates the agent's interaction with the underlying environment'''
@@ -110,7 +103,7 @@ class Task(object):
     def is_terminal(self):
         # Is the environment in a terminal state, i.e. are there no possible
         # successors
-        state = self.get_current_state()
+        state = self.env.get_current_state()
         poss_actions = self.get_allowed_actions(state)
         return len(poss_actions) == 0
 

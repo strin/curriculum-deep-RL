@@ -1,5 +1,6 @@
 import random
 import environment
+import numpy as np
 
 
 class Grid(environment.Environment):
@@ -134,6 +135,7 @@ class GridWorldMDP(environment.MDP):
         return self.env.next_state_distribution(self.env.state_pos[state], action)
 
 
+# TODO: FIX THE STATE REPRESENTATION SO THE CONVERSION TO TABULAR HAPPENS HERE!
 class GridWorld(environment.Task):
     ''' RL variant of gridworld where the dynamics and reward function are not
         fully observed
@@ -142,17 +144,44 @@ class GridWorld(environment.Task):
         reward states, it receives the reward and is reset to a new starting
         location.
         '''
-    def __init__(self, grid, rewards, wall_penalty, gamma):
+    def __init__(self, grid, rewards, wall_penalty, gamma, tabular=True):
         ''' Assumes grid has already been initialized. Rewards is a map of
             (x, y)-coordinates and the reward for reaching that point'''
         self.wall_penalty = wall_penalty
         self.rewards = rewards
         self.env = grid
         self.gamma = gamma
+        self.tabular = tabular
         self.reset()
 
+    def get_state_dimension(self):
+        if self.tabular:
+            return self.env.get_state_dimension()
+
+        return self.env.grid.shape[0] * self.env.grid.shape[1] * 2.
+
+    def get_current_state(self):
+        if self.tabular:
+            return self.env.get_current_state()
+
+        agent_state = np.zeros_like(self.env.grid)
+        agent_state[self.env.state_pos[self.env.get_current_state()]] = 1.0
+        return np.concatenate((agent_state.ravel(), self.env.grid.ravel())).reshape(-1, 1)
+
+    def perform_action(self, action):
+        curr_state = self.env.get_current_state()
+        next_state = self.env.perform_action(action)
+        reward = self.get_reward(curr_state, action, next_state)
+
+        if not self.tabular:
+            agent_state = np.zeros_like(self.env.grid)
+            agent_state[self.env.state_pos[next_state]] = 1.0
+            next_state = np.concatenate((agent_state.ravel(), self.env.grid.ravel())).reshape(-1, 1)
+
+        return (next_state, reward)
+
     def reset(self):
-        while(self.env.state_pos[self.get_current_state()] in self.rewards):
+        while(self.env.state_pos[self.env.get_current_state()] in self.rewards):
             self.env.reset()
 
     def get_allowed_actions(self, state):
