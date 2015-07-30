@@ -181,7 +181,7 @@ class DQN(OnlineAgent):
                     - Gradient clipping (this is important for RL applications)
     '''
 
-    def __init__(self, task, options, hidden_dim=100, l2_reg=0.0, lr=1e-1):
+    def __init__(self, task, hidden_dim=128, l2_reg=0.0, lr=1e-1, epsilon=0.05):
         self.task = task
         self.state_dim = task.get_state_dimension()
         self.num_actions = task.get_num_actions()
@@ -189,6 +189,7 @@ class DQN(OnlineAgent):
         self.hidden_dim = hidden_dim
         self.l2_reg = l2_reg
         self.lr = lr
+        self.epsilon = epsilon
 
         self._initialize_net()
 
@@ -198,13 +199,18 @@ class DQN(OnlineAgent):
 
     def _initialize_net(self):
         # simple 2 layer net with l2-loss
-        state = T.vector('state')
-        hidden_layer = layers.FullyConnected(inputs=state,
-                                             input_dim=self.state_dim,
-                                             output_dim=self.hidden_dim,
-                                             activation=T.nnet.relu)
+        state = T.col('state')
+        hidden_layer1 = layers.FullyConnected(inputs=state,
+                                              input_dim=self.state_dim,
+                                              output_dim=self.hidden_dim,
+                                              activation='relu')
 
-        linear_layer = layers.FullyConnected(inputs=hidden_layer.output,
+        hidden_layer2 = layers.FullyConnected(inputs=hidden_layer1.output,
+                                              input_dim=self.hidden_dim,
+                                              output_dim=self.hidden_dim,
+                                              activation='relu')
+
+        linear_layer = layers.FullyConnected(inputs=hidden_layer2.output,
                                              input_dim=self.hidden_dim,
                                              output_dim=self.num_actions,
                                              activation=None)
@@ -212,15 +218,16 @@ class DQN(OnlineAgent):
         action_values = linear_layer.output
 
         target = T.scalar('target')
-        last_action = T.scalar('action')
+        last_action = T.lscalar('action')
         MSE = layers.MSE(action_values[last_action], target)
 
-        params = [hidden_layer.params, linear_layer.params]
+        params = hidden_layer1.params + hidden_layer2.params + linear_layer.params
 
         l2_penalty = 0.
         for param in params:
             l2_penalty += (param ** 2).sum()
-        cost = MSE + self.l2_reg * l2_penalty
+
+        cost = MSE.output + self.l2_reg * l2_penalty
 
         grads = T.grad(cost, params)
 
@@ -228,10 +235,12 @@ class DQN(OnlineAgent):
         updates = [(param, param - self.lr * gparam) for param, gparam
                    in zip(params, grads)]
 
+        print "Compiling fprop"
         self.fprop = theano.function(inputs=[state], outputs=[action_values],
                                      name='fprop')
 
         # takes a single gradient step
+        print "Compiling backprop"
         self.bprop = theano.function(inputs=[state, last_action, target],
                                      outputs=[cost], updates=updates)
 
@@ -247,7 +256,7 @@ class DQN(OnlineAgent):
     def get_action(self, state):
         # epsilon greedy w.r.t the current policy
         if(random.random() < self.epsilon):
-            action = random.randint(0, self.num_actions)
+            action = random.randint(0, self.num_actions - 1)
         else:
             action = self._greedy_action(state)
 
