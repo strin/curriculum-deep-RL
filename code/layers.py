@@ -33,6 +33,8 @@ class FullyConnected(object):
             self.output = W.dot(inputs) + b
         elif activation is 'relu':
             self.output = T.maximum(W.dot(inputs) + b, 0)
+        elif activation is 'tanh':
+            self.output = T.tanh(W.dot(inputs) + b)
         else:
             raise NotImplementedError()
 
