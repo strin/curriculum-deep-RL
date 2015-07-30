@@ -3,6 +3,7 @@ import numpy as np
 import theano
 import theano.tensor as T
 import layers
+import optimizers
 
 
 class OnlineAgent(object):
@@ -181,7 +182,8 @@ class DQN(OnlineAgent):
                     - Gradient clipping (this is important for RL applications)
     '''
 
-    def __init__(self, task, hidden_dim=128, l2_reg=0.0, lr=1e-1, epsilon=0.05):
+    def __init__(self, task, hidden_dim=128, l2_reg=0.0, lr=1e-1, epsilon=0.05,
+                 memory_size=100, minibatch_size=5):
         self.task = task
         self.state_dim = task.get_state_dimension()
         self.num_actions = task.get_num_actions()
@@ -190,8 +192,15 @@ class DQN(OnlineAgent):
         self.l2_reg = l2_reg
         self.lr = lr
         self.epsilon = epsilon
+        self.memory_size = memory_size  # number of experiences to store
+        self.minibatch_size = minibatch_size
 
         self._initialize_net()
+
+        # for now, keep experience as a list of tuples
+        # and use the clock-hand algorithm to decide who to evict
+        self.experience = []
+        self.exp_idx = 0
 
         # used for streaming updates
         self.last_state = None
@@ -229,11 +238,7 @@ class DQN(OnlineAgent):
 
         cost = MSE.output + self.l2_reg * l2_penalty
 
-        grads = T.grad(cost, params)
-
-        # vanilla SGD update
-        updates = [(param, param - self.lr * gparam) for param, gparam
-                   in zip(params, grads)]
+        updates = optimizers.Adam(cost, params)
 
         print "Compiling fprop"
         self.fprop = theano.function(inputs=[state], outputs=[action_values],
@@ -241,8 +246,9 @@ class DQN(OnlineAgent):
 
         # takes a single gradient step
         print "Compiling backprop"
+        td_error = T.sqrt(MSE.output)
         self.bprop = theano.function(inputs=[state, last_action, target],
-                                     outputs=[cost], updates=updates)
+                                     outputs=[td_error], updates=updates)
 
     def reset_episode(self):
         self.last_state = None
@@ -265,15 +271,45 @@ class DQN(OnlineAgent):
 
         return action
 
+    def _add_to_experience(self, s, a, ns, r):
+        # TODO: improve experience replay mechanism by adding second-chance
+        # algorithm, i.e. don't automatically evict an experience if it has
+        # very high td_error
+        if len(self.experience) < self.memory_size:
+            self.experience.append((s, a, ns, r))
+        else:
+            self.experience[self.exp_idx] = (s, a, ns, r)
+            self.exp_idx += 1
+            if self.exp_idx >= self.memory_size:
+                self.exp_idx = 0
+
+    def _update_net(self):
+        # sample from the memory dataset and perform gradient descent on
+        # (target - Q(s, a))^2
+
+        # TODO: Process these samples in batch!
+        for sample in xrange(self.minibatch_size):
+            state, act, next_state, reward = random.choice(self.experience)
+
+            # max_{a'} Q(ns, a')
+            next_qsa = np.max(self.fprop(next_state))
+            target = reward + self.gamma * next_qsa
+
+            # update network
+            td_error = self.bprop(state, act, target)
+
+            # TODO: mark the current entry if it has high td_error to remain in
+            # the cache
+
     def learn(self, next_state, reward):
-        # max_{a'} Q(ns, a')
         next_qsa = np.max(self.fprop(next_state))
         target = reward + self.gamma * next_qsa
 
-        # gradient descent on target - Q(s, a)
-        self.bprop(self.last_state, self.last_action, target)
-
-        # TODO: add experience replay mechanism here
+        # update network
+        td_error = self.bprop(self.last_state, self.last_action, target)
+        self._add_to_experience(self.last_state, self.last_action,
+                                next_state, reward)
+        self._update_net()
 
 
 class ReinforceAgent(OnlineAgent):
