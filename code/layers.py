@@ -4,7 +4,7 @@ import theano.tensor as T
 
 
 class FullyConnected(object):
-    def __init__(self, inputs, input_dim, output_dim, activation=T.nnet.relu):
+    def __init__(self, inputs, input_dim, output_dim, activation='relu'):
         '''
             TODO: choice of initialization
                     - Currently uses the initialization scheme for relu
@@ -21,20 +21,20 @@ class FullyConnected(object):
 
         # initialize weight matrix W of size (output_dim, input_dim)
         std_dev = np.sqrt(2. / input_dim)
-        W_init = np.asarray(std_dev * np.random.randn(output_dim, input_dim),
-                            dtype=theano.config.float)
+        W_init = std_dev * np.random.randn(output_dim, input_dim)
         W = theano.shared(value=W_init, name='W')
 
         # initialize bias vector b of size (output_dim, 1)
-        b_init = np.asarray(np.zeros((output_dim, 1)),
-                            dtype=theano.config.float)
+        b_init = np.zeros((output_dim, 1))
         b = theano.shared(value=b_init, name='b')
 
         # set-up the outputs
         if activation is None:
             self.output = W.dot(inputs) + b
+        elif activation is 'relu':
+            self.output = T.maximum(W.dot(inputs) + b, 0)
         else:
-            self.output = activation(W.dot(inputs) + b)
+            raise NotImplementedError()
 
         # store parameters
         self.W = W
@@ -49,4 +49,4 @@ class MSE(object):
         '''
         self.input = inputs
         self.targets = targets
-        self.outputs = T.mean((inputs - targets)**2)
+        self.output = T.mean((inputs - targets)**2)
