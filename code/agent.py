@@ -238,7 +238,7 @@ class DQN(OnlineAgent):
 
         cost = MSE.output + self.l2_reg * l2_penalty
 
-        updates = optimizers.Adam(cost, params)
+        updates = optimizers.Adam(cost, params, alpha=0.005)
 
         print "Compiling fprop"
         self.fprop = theano.function(inputs=[state], outputs=[action_values],
@@ -287,7 +287,12 @@ class DQN(OnlineAgent):
         # sample from the memory dataset and perform gradient descent on
         # (target - Q(s, a))^2
 
-        # TODO: Process these samples in batch!
+        # TODO: Pass the batches through the network together rather than
+        #       individually
+
+        # TODO: mark the current entry if it has high td_error to remain in
+        # the cache
+        batch = []
         for sample in xrange(self.minibatch_size):
             state, act, next_state, reward = random.choice(self.experience)
 
@@ -295,18 +300,15 @@ class DQN(OnlineAgent):
             next_qsa = np.max(self.fprop(next_state))
             target = reward + self.gamma * next_qsa
 
-            # update network
-            td_error = self.bprop(state, act, target)
-
-            # TODO: mark the current entry if it has high td_error to remain in
-            # the cache
-
-    def learn(self, next_state, reward):
-        next_qsa = np.max(self.fprop(next_state))
-        target = reward + self.gamma * next_qsa
+            # collect (state, act, target pairs before backprop)
+            batch.append((state, act, target))
 
         # update network
-        td_error = self.bprop(self.last_state, self.last_action, target)
+        for sample in batch:
+            state, act, target = sample
+            td_error = self.bprop(state, act, target)
+
+    def learn(self, next_state, reward):
         self._add_to_experience(self.last_state, self.last_action,
                                 next_state, reward)
         self._update_net()
