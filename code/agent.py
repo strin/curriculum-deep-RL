@@ -60,7 +60,7 @@ class ValueIterationSolver(OnlineAgent):
             for state in xrange(self.num_states):
                 poss_actions = self.mdp.get_allowed_actions(state)
 
-                best_val = 0
+                best_val = 0.
                 for idx, action in enumerate(poss_actions):
                     val = 0.
                     ns_dist = self.mdp.next_state_distribution(state, action)
@@ -180,6 +180,7 @@ class DQN(OnlineAgent):
                     - Tuning learning rates
                     - Regularization
                     - Gradient clipping (this is important for RL applications)
+                    - reward clipping
     '''
 
     def __init__(self, task, hidden_dim=128, l2_reg=0.0, lr=1e-1, epsilon=0.05,
@@ -198,7 +199,6 @@ class DQN(OnlineAgent):
         self._initialize_net()
 
         # for now, keep experience as a list of tuples
-        # and use the clock-hand algorithm to decide who to evict
         self.experience = []
         self.exp_idx = 0
 
@@ -238,7 +238,7 @@ class DQN(OnlineAgent):
 
         cost = MSE.output + self.l2_reg * l2_penalty
 
-        updates = optimizers.Adam(cost, params, alpha=0.005)
+        updates = optimizers.Adam(cost, params)
 
         print "Compiling fprop"
         self.fprop = theano.function(inputs=[state], outputs=[action_values],
@@ -250,21 +250,21 @@ class DQN(OnlineAgent):
         self.bprop = theano.function(inputs=[state, last_action, target],
                                      outputs=[td_error], updates=updates)
 
-    def reset_episode(self):
+    def end_episode(self, reward):
+        if self.last_state is not None:
+            self._add_to_experience(self.last_state, self.last_action, None,
+                                    reward)
         self.last_state = None
         self.last_action = None
 
-    def _greedy_action(self, state):
-        ''' a^* = argmax_{a} Q(s, a) '''
-        q_vals = self.fprop(state)
-        return q_vals.index(max(q_vals))
-
     def get_action(self, state):
         # epsilon greedy w.r.t the current policy
-        if(random.random() < self.epsilon):
-            action = random.randint(0, self.num_actions - 1)
+        # random actions until the memory bank fills up
+        if(random.random() < self.epsilon or len(self.experience) < self.memory_size):
+            action = np.random.randint(0, self.num_actions)
         else:
-            action = self._greedy_action(state)
+            # a^* = argmax_{a} Q(s, a)
+            action = np.argmax(self.fprop(state))
 
         self.last_state = state
         self.last_action = action
@@ -284,21 +284,23 @@ class DQN(OnlineAgent):
                 self.exp_idx = 0
 
     def _update_net(self):
+        if len(self.experience) < self.memory_size:
+            return
         # sample from the memory dataset and perform gradient descent on
         # (target - Q(s, a))^2
 
         # TODO: Pass the batches through the network together rather than
-        #       individually
-
-        # TODO: mark the current entry if it has high td_error to remain in
-        # the cache
+        #       individually for speed improvement
         batch = []
         for sample in xrange(self.minibatch_size):
             state, act, next_state, reward = random.choice(self.experience)
 
             # max_{a'} Q(ns, a')
-            next_qsa = np.max(self.fprop(next_state))
-            target = reward + self.gamma * next_qsa
+            if next_state is not None:
+                next_qsa = np.max(self.fprop(next_state))
+                target = reward + self.gamma * next_qsa
+            else:
+                target = reward
 
             # collect (state, act, target pairs before backprop)
             batch.append((state, act, target))
@@ -306,7 +308,7 @@ class DQN(OnlineAgent):
         # update network
         for sample in batch:
             state, act, target = sample
-            td_error = self.bprop(state, act, target)
+            self.bprop(state, act, target)
 
     def learn(self, next_state, reward):
         self._add_to_experience(self.last_state, self.last_action,
