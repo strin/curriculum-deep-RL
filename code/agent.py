@@ -117,7 +117,7 @@ class TDLearner(OnlineAgent):
         self.last_state = None
         self.last_action = None
 
-    def reset_episode(self):
+    def end_episode(self, reward):
         self.last_state = None
         self.last_action = None
 
@@ -162,7 +162,9 @@ class TDLearner(OnlineAgent):
         self.Q[s0][a0] += self.alpha * td_error
 
     def learn(self, next_state, reward):
-        self._td_update(self.last_state, self.last_action, reward, next_state)
+        if self.last_state is not None:
+            self._td_update(self.last_state, self.last_action, reward,
+                            next_state)
 
         # TODO: Add planning HERE;
 
@@ -170,21 +172,12 @@ class TDLearner(OnlineAgent):
 class DQN(OnlineAgent):
     ''' Q-learning with a neural network function approximator
 
-        TODO:       - Add experience replay
-                            - This will speed up the model since we can
-                               batch updates together for the forward
-                               and backward passes
-                                - Also, if we don't clone the next, then there
-                                  is no need to 2 do separate passes
-                    - Incorporate the online optimizer
-                    - Tuning learning rates
-                    - Regularization
-                    - Gradient clipping (this is important for RL applications)
-                    - reward clipping
+        TODO:   - reward clipping
+                - epsilon decay
     '''
 
     def __init__(self, task, hidden_dim=128, l2_reg=0.0, lr=1e-1, epsilon=0.05,
-                 memory_size=100, minibatch_size=5):
+                 memory_size=250, minibatch_size=32):
         self.task = task
         self.state_dim = task.get_state_dimension()
         self.num_actions = task.get_num_actions()
@@ -208,8 +201,8 @@ class DQN(OnlineAgent):
 
     def _initialize_net(self):
         # simple 2 layer net with l2-loss
-        state = T.col('state')
-        hidden_layer1 = layers.FullyConnected(inputs=state,
+        states = T.matrix('states')
+        hidden_layer1 = layers.FullyConnected(inputs=states,
                                               input_dim=self.state_dim,
                                               output_dim=self.hidden_dim,
                                               activation='relu')
@@ -226,9 +219,10 @@ class DQN(OnlineAgent):
 
         action_values = linear_layer.output
 
-        target = T.scalar('target')
-        last_action = T.lscalar('action')
-        MSE = layers.MSE(action_values[last_action], target)
+        targets = T.vector('target')
+        last_actions = T.lvector('action')
+        MSE = layers.MSE(action_values[last_actions,
+                         T.arange(action_values.shape[1])], targets)
 
         params = hidden_layer1.params + hidden_layer2.params + linear_layer.params
 
@@ -241,14 +235,14 @@ class DQN(OnlineAgent):
         updates = optimizers.Adam(cost, params)
 
         print "Compiling fprop"
-        self.fprop = theano.function(inputs=[state], outputs=[action_values],
+        self.fprop = theano.function(inputs=[states], outputs=action_values,
                                      name='fprop')
 
         # takes a single gradient step
         print "Compiling backprop"
-        td_error = T.sqrt(MSE.output)
-        self.bprop = theano.function(inputs=[state, last_action, target],
-                                     outputs=[td_error], updates=updates)
+        td_errors = T.sqrt(MSE.output)
+        self.bprop = theano.function(inputs=[states, last_actions, targets],
+                                     outputs=td_errors, updates=updates)
 
     def end_episode(self, reward):
         if self.last_state is not None:
@@ -259,8 +253,7 @@ class DQN(OnlineAgent):
 
     def get_action(self, state):
         # epsilon greedy w.r.t the current policy
-        # random actions until the memory bank fills up
-        if(random.random() < self.epsilon or len(self.experience) < self.memory_size):
+        if(random.random() < self.epsilon):
             action = np.random.randint(0, self.num_actions)
         else:
             # a^* = argmax_{a} Q(s, a)
@@ -272,9 +265,8 @@ class DQN(OnlineAgent):
         return action
 
     def _add_to_experience(self, s, a, ns, r):
-        # TODO: improve experience replay mechanism by adding second-chance
-        # algorithm, i.e. don't automatically evict an experience if it has
-        # very high td_error
+        # TODO: improve experience replay mechanism by making it harder to
+        # evict experiences with high td_error, for example
         if len(self.experience) < self.memory_size:
             self.experience.append((s, a, ns, r))
         else:
@@ -284,31 +276,44 @@ class DQN(OnlineAgent):
                 self.exp_idx = 0
 
     def _update_net(self):
+        '''
+            sample from the memory dataset and perform gradient descent on
+            (target - Q(s, a))^2
+        '''
+
+        # don't update the network until sufficient experience has been
+        # accumulated
         if len(self.experience) < self.memory_size:
             return
-        # sample from the memory dataset and perform gradient descent on
-        # (target - Q(s, a))^2
 
-        # TODO: Pass the batches through the network together rather than
-        #       individually for speed improvement
-        batch = []
-        for sample in xrange(self.minibatch_size):
-            state, act, next_state, reward = random.choice(self.experience)
+        states = np.zeros((self.state_dim, self.minibatch_size))
+        next_states = np.zeros((self.state_dim, self.minibatch_size))
+        actions = np.zeros(self.minibatch_size, dtype=int)
+        rewards = np.zeros(self.minibatch_size)
 
-            # max_{a'} Q(ns, a')
+        # sample and process minibatch
+        samples = random.sample(self.experience, self.minibatch_size)
+        terminals = []
+        for idx, sample in enumerate(samples):
+            state, action, next_state, reward = sample
+            states[:, idx] = state.ravel()
+            actions[idx] = action
+            rewards[idx] = reward
+
             if next_state is not None:
-                next_qsa = np.max(self.fprop(next_state))
-                target = reward + self.gamma * next_qsa
+                next_states[:, idx] = next_state.ravel()
             else:
-                target = reward
+                terminals.append(idx)
 
-            # collect (state, act, target pairs before backprop)
-            batch.append((state, act, target))
+        # compute targets reward + \gamma max_{a'} Q(ns, a')
+        next_qvals = np.max(self.fprop(next_states), axis=0)
 
-        # update network
-        for sample in batch:
-            state, act, target = sample
-            self.bprop(state, act, target)
+        # Ensure target = reward when NEXT_STATE is terminal
+        next_qvals[terminals] = 0.
+
+        targets = rewards + self.gamma * next_qvals
+
+        self.bprop(states, actions, targets.ravel())
 
     def learn(self, next_state, reward):
         self._add_to_experience(self.last_state, self.last_action,
