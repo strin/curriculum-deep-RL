@@ -1,3 +1,4 @@
+import numpy as np
 import theano
 import theano.tensor as T
 
@@ -14,9 +15,12 @@ def Adam(cost, params, alpha=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-8):
 
     alpha_t = alpha * T.sqrt(1. - beta_2**t) / (1. - beta_1**t)
     for param, gparam in zip(params, grads):
+        value = param.get_value(borrow=True)
         # initialize first and second moment updates parameter-wise
-        m = theano.shared(value=param.get_value() * 0., name='m')
-        v = theano.shared(value=param.get_value() * 0., name='v')
+        m = theano.shared(value=np.zeros(value.shape, dtype=value.dtype),
+                          broadcastable=param.broadcastable, name='m')
+        v = theano.shared(value=np.zeros(value.shape, dtype=value.dtype),
+                          broadcastable=param.broadcastable, name='v')
 
         # update biased first/second moment estimates
         m_t = beta_1 * m + (1. - beta_1) * gparam
@@ -44,8 +48,10 @@ def Adagrad(cost, params, base_lr=1e-2, epsilon=1e-8):
     updates = []
     grads = T.grad(cost, params)
     for param, gparam in zip(params, grads):
+        value = param.get_value(borrow=True)
         # cache for sum of squared historical gradients
-        cache = theano.shared(value=param.get_value() * 0., name='cache')
+        cache = theano.shared(value=np.zeros(value.shape, dtype=value.dtype),
+                              broadcastable=param.broadcastable, name='cache')
         cache_t = cache + T.sqr(gparam)
 
         # per parameter adaptive learning rate
@@ -65,8 +71,10 @@ def RMSProp(cost, params, base_lr=1e-2, decay_rate=0.99, epsilon=1e-8):
     updates = []
     grads = T.grad(cost, params)
     for param, gparam in zip(params, grads):
+        value = param.get_value(borrow=True)
         # leaky cache of sum of squared historical gradients
-        cache = theano.shared(param.get_value() * 0., name='cache')
+        cache = theano.shared(value=np.zeros(value.shape, dtype=value.dtype),
+                              broadcastable=param.broadcastable, name='cache')
         cache_t = decay_rate * cache + (1. - decay_rate) * T.sqr(gparam)
 
         # per parameter adaptive learning rate

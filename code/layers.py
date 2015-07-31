@@ -26,7 +26,7 @@ class FullyConnected(object):
 
         # initialize bias vector b of size (output_dim, 1)
         b_init = np.zeros((output_dim, 1))
-        b = theano.shared(value=b_init, name='b')
+        b = theano.shared(value=b_init, name='b', broadcastable=(False, True))
 
         # set-up the outputs
         if activation is None:
