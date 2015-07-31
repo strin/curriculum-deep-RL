@@ -27,7 +27,7 @@ def Adam(cost, params, alpha=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-8):
         # update parameter vector
         param_t = param - ((alpha * m_t) / (T.sqrt(v_t) + epsilon))
 
-        # remember changes to the shared variables
+        # store changes to the shared variables
         updates.append((m, m_t))
         updates.append((v, v_t))
         updates.append((param, param_t))
@@ -51,7 +51,7 @@ def Adagrad(cost, params, base_lr=1e-2, epsilon=1e-8):
         # per parameter adaptive learning rate
         param_t = param - base_lr * gparam / (T.sqrt(cache_t) + epsilon)
 
-        # remember changes to the shared variables
+        # store changes to the shared variables
         updates.append((cache, cache_t))
         updates.append((param, param_t))
 
@@ -72,7 +72,7 @@ def RMSProp(cost, params, base_lr=1e-2, decay_rate=0.99, epsilon=1e-8):
         # per parameter adaptive learning rate
         param_t = param - base_lr * gparam / (T.sqrt(cache_t) + epsilon)
 
-        # remember changes to the shared variables
+        # store changes to the shared variables
         updates.append((cache, cache_t))
         updates.append((param, param_t))
 
