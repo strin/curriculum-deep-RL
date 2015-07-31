@@ -11,6 +11,8 @@ def Adam(cost, params, alpha=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-8):
     updates = []
     t = theano.shared(value=1., name='t')
     grads = T.grad(cost, params)
+
+    alpha_t = alpha * T.sqrt(1. - beta_2**t) / (1. - beta_1**t)
     for param, gparam in zip(params, grads):
         # initialize first and second moment updates parameter-wise
         m = theano.shared(value=param.get_value() * 0., name='m')
@@ -20,12 +22,10 @@ def Adam(cost, params, alpha=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-8):
         m_t = beta_1 * m + (1. - beta_1) * gparam
         v_t = beta_2 * v + (1. - beta_2) * T.sqr(gparam)
 
-        # correct estimates for bias
-        m_t /= 1. - beta_1**t
-        v_t /= 1. - beta_2**t
-
-        # update parameter vector
-        param_t = param - ((alpha * m_t) / (T.sqrt(v_t) + epsilon))
+        # use the efficient update from sec. 2 of the paper to avoid
+        # computing the unbiased estimates
+        g_t = m_t / (T.sqrt(v_t) + epsilon)
+        param_t = param - alpha_t * g_t
 
         # store changes to the shared variables
         updates.append((m, m_t))
