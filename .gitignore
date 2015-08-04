@@ -1,2 +1,6 @@
 # ignore compiled object files
 *.pyc
+
+# ignore ipython notebooks and checkpoints
+*.ipynb
+*.ipynb_checkpoints*
