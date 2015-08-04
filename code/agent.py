@@ -200,6 +200,9 @@ class DQN(OnlineAgent):
         self.last_action = None
 
     def _initialize_net(self):
+        '''
+            Attaches fprop and bprop functions to the class
+        '''
         # simple 2 layer net with l2-loss
         states = T.matrix('states')
         hidden_layer1 = layers.FullyConnected(inputs=states,
@@ -243,6 +246,8 @@ class DQN(OnlineAgent):
         td_errors = T.sqrt(MSE.output)
         self.bprop = theano.function(inputs=[states, last_actions, targets],
                                      outputs=td_errors, updates=updates)
+
+        return params
 
     def end_episode(self, reward):
         if self.last_state is not None:
@@ -313,7 +318,7 @@ class DQN(OnlineAgent):
 
         targets = rewards + self.gamma * next_qvals
 
-        self.bprop(states, actions, targets.ravel())
+        self.bprop(states, actions, targets.flatten())
 
     def learn(self, next_state, reward):
         self._add_to_experience(self.last_state, self.last_action,
@@ -321,14 +326,144 @@ class DQN(OnlineAgent):
         self._update_net()
 
 
-class ReinforceAgent(OnlineAgent):
-    ''' Policy Gradient with a neural network function approximator '''
+class RecurrentReinforceAgent(OnlineAgent):
+    ''' Policy Gradient with a LSTM function approximator '''
+    def __init__(self, task, hidden_dim=1024, options=None):
+        self.task = task
+        self.state_dim = task.get_state_dimension()  # input dimensionaliy
+        self.num_actions = task.get_num_actions()  # softmax output dimensionality
+        self.hidden_dim = hidden_dim  # number of RNN cells
+        self.gamma = task.gamma
 
-    def __init__(self, options, task):
-        pass
+        # store of previous trajectories.. for now it is just 1.
+        self.trajectory = {'states': [], 'actions': [], 'rewards': []}
+
+        self._initialize_net()
+
+        # used for streaming updates
+        self.last_state = None
+        self.last_action = None
+
+    def _initialize_net(self):
+        '''
+            For now, just initialize the RNN controller. Soon, the RNN will
+            become an LSTM. Also,  we will want to have another LSTM attempt
+            to predict the value function for the current state (i.e. use a
+            baseline to estimate the advantage function)
+        '''
+        rnn_layer = layers.RNNLayer(self.state_dim, self.hidden_dim,
+                                    self.num_actions,
+                                    hidden_activation='relu',
+                                    output_activation=None)
+
+        h = theano.shared(value=np.zeros((1, self.hidden_dim)), name='h')
+
+        # the initial hidden state isn't a param for now
+        params = rnn_layer.params
+
+        def step(state, hidden_vector):
+            next_h, outputs = rnn_layer(state, hidden_vector)
+            action_probs = T.nnet.softmax(outputs)
+            return next_h, action_probs
+
+        # forward prop takes a single step, updates the hidden layer,
+        # and returns the action probabilities conditioned on the past
+        curr_state = T.row('curr_state')
+        next_h, action_probs = step(curr_state, h)
+
+        print 'Compiling fprop'
+        self.fprop = theano.function(inputs=[curr_state], outputs=action_probs,
+                                     updates=[(h, next_h)], name='fprop')
+
+        # backprop is more involved... we use REINFORCE to compute a descent
+        # direction
+        start_h = h * 0.
+        state_sequence = T.matrix('state_sequence')
+        action_sequence = T.lvector('action_sequence')  # must be integers
+        reward_sequence = T.vector('reward_sequence')
+
+        # scan returns a list of \pi(a_t \mid o_{1:t}) for all t
+        [hidden_states, action_probs], _ = theano.scan(fn=step,
+                                                       sequences=state_sequence,
+                                                       outputs_info=[start_h, None]
+                                                       )
+
+        # remove the column dimension to get a matrix
+        action_probs = action_probs[:, 0, :]
+
+        # get the log probabilities for the actions taken along this path
+        log_action_probs = T.log(action_probs[T.arange(action_probs.shape[0]),
+                                 action_sequence])
+
+        # reward[0] = 0:T, reward[1] = 1:T, etc.
+        rewards = T.cumsum(reward_sequence[::-1])[::-1]
+
+        cost = -T.sum(log_action_probs * rewards)
+
+        # take a gradient descent step
+        updates = optimizers.Adam(cost, params)
+
+        print 'Compiling backprop'
+        self.bprop = theano.function(inputs=[state_sequence, action_sequence,
+                                             reward_sequence],
+                                     outputs=cost,
+                                     updates=updates, name='bprop')
+
+        # reset simply sets the hidden state to zero for now.
+        # TODO: backprop through hidden state
+        print 'Compiling reset'
+        self.reset_net = theano.function(inputs=[], updates=[(h, start_h)])
+
+    def end_episode(self, reward):
+        '''
+            Updates the network
+        '''
+        self._add_to_experience(self.last_state, self.last_action, reward)
+
+        # take a single gradient step
+        # for now, we are only using a single sampled trajectory
+        state_seq = np.vstack(self.trajectory['states'])  # matrix w/ states as rows
+        action_seq = self.trajectory['actions']
+        reward_seq = self.trajectory['rewards']
+
+        # print state_seq
+        # print action_seq
+        # print reward_seq
+        # print '\n'
+        cost = self.bprop(state_seq, action_seq, reward_seq)
+        # print 'Cost!: ', cost
+
+        self.reset_net()
+        self.trajectory['states'] = []
+        self.trajectory['actions'] = []
+        self.trajectory['rewards'] = []
 
     def get_action(self, state):
-        pass
+        '''
+            Uses a soft-action selection policy, where each action is
+            selected according with probability p(a_t \mid s_{1:t}, a_{1:t-1})
+        '''
+        action_probs = self.fprop(state.T).flatten()
+        action = np.random.choice(np.arange(self.num_actions), p=action_probs)
+        self.last_state = state
+        self.last_action = action
+        return action
 
-    def learn(self, reward):
-        pass
+    def _add_to_experience(self, state, action, reward):
+        '''
+            Note: states are stored as row-vectors
+        '''
+        self.trajectory['states'].append(state.T)
+        self.trajectory['actions'].append(action)
+        self.trajectory['rewards'].append(reward)
+
+    def learn(self, next_state, reward):
+        '''
+            NEXT_STATE is unused, but appears in the prototype to keep the
+            same api
+        '''
+        # add the most experience to the dataset
+        self._add_to_experience(self.last_state, self.last_action, reward)
+
+        # TODO: Don't wait until the end of the episode to update params, just
+        # do it every T steps
