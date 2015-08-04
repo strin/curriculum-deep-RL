@@ -51,4 +51,67 @@ class MSE(object):
         '''
         self.input = inputs
         self.targets = targets
-        self.output = T.mean((inputs - targets)**2)
+        self.output = T.mean(T.sqr(inputs - targets))
+
+
+class RNNLayer(object):
+    def __init__(self, input_dim, hidden_dim, output_dim,
+                 hidden_activation='relu', output_activation=None):
+        '''
+            input_dim: input dimensionality
+            hidden_dim: hidden layer dimensionality
+            output_dim: output layer dimensionality (number of classes inputs
+                                                     a single layer model)
+        '''
+        self.hidden_activation = hidden_activation
+        self.output_activation = output_activation
+        # input to hidden layer weight matrix
+        std_dev = np.sqrt(2. / input_dim)
+        W_x_init = std_dev * np.random.randn(input_dim, hidden_dim)
+        self.W_x = theano.shared(value=W_x_init, name='W_x')
+
+        # hidden layer to output matrix
+        W_o_init = 0.01 * np.random.randn(hidden_dim, output_dim)
+        self.W_o = theano.shared(value=W_o_init, name='W_o')
+
+        # hidden layer to hidden layer matrix
+        W_h_init = std_dev * np.random.randn(hidden_dim, hidden_dim)
+        self.W_h = theano.shared(value=W_h_init, name='W_h')
+
+        # biases
+        b_h_init = np.zeros((1, hidden_dim))
+        self.b_h = theano.shared(value=b_h_init, name='b_h',
+                                 broadcastable=(True, False))
+
+        b_o_init = np.zeros((1, output_dim))
+        self.b_o = theano.shared(value=b_o_init, name='b_o',
+                                 broadcastable=(True, False))
+
+        # store params
+        self.params = [self.W_x, self.W_o, self.W_h, self.b_h, self.b_o]
+
+    def _apply_nonlinearity(self, activations, nonlinearity):
+         # set-up the outputs
+        if nonlinearity is None:
+            return activations
+        elif nonlinearity is 'relu':
+            return T.maximum(activations, 0)
+        elif nonlinearity is 'tanh':
+            return T.tanh(activations)
+        else:
+            raise NotImplementedError()
+
+    def __call__(self, x, h):
+        '''
+            Take a single RNN step. Requires as input the current state x
+            and previous hidden state h
+
+            Return the output and the new hidden state.
+        '''
+        new_h = self._apply_nonlinearity(x.dot(self.W_x) + h.dot(self.W_h) +
+                                         self.b_h, self.hidden_activation)
+
+        output = self._apply_nonlinearity(new_h.dot(self.W_o) + self.b_o,
+                                          self.output_activation)
+
+        return [new_h, output]
