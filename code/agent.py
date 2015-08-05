@@ -310,7 +310,7 @@ class DQN(OnlineAgent):
             else:
                 terminals.append(idx)
 
-        # compute targets reward + \gamma max_{a'} Q(ns, a')
+        # compute target reward + \gamma max_{a'} Q(ns, a')
         next_qvals = np.max(self.fprop(next_states), axis=0)
 
         # Ensure target = reward when NEXT_STATE is terminal
@@ -353,7 +353,7 @@ class RecurrentReinforceAgent(OnlineAgent):
         '''
         rnn_layer = layers.RNNLayer(self.state_dim, self.hidden_dim,
                                     self.num_actions,
-                                    hidden_activation='relu',
+                                    hidden_activation='tanh',
                                     output_activation=None)
 
         h = theano.shared(value=np.zeros((1, self.hidden_dim)), name='h')
@@ -363,7 +363,7 @@ class RecurrentReinforceAgent(OnlineAgent):
 
         def step(state, hidden_vector):
             next_h, outputs = rnn_layer(state, hidden_vector)
-            action_probs = T.nnet.softmax(outputs)
+            action_probs = layers.SoftMax(outputs).outputs
             return next_h, action_probs
 
         # forward prop takes a single step, updates the hidden layer,
@@ -406,7 +406,7 @@ class RecurrentReinforceAgent(OnlineAgent):
         print 'Compiling backprop'
         self.bprop = theano.function(inputs=[state_sequence, action_sequence,
                                              reward_sequence],
-                                     outputs=cost,
+                                     outputs=[cost, action_probs],
                                      updates=updates, name='bprop')
 
         # reset simply sets the hidden state to zero for now.
@@ -426,12 +426,7 @@ class RecurrentReinforceAgent(OnlineAgent):
         action_seq = self.trajectory['actions']
         reward_seq = self.trajectory['rewards']
 
-        # print state_seq
-        # print action_seq
-        # print reward_seq
-        # print '\n'
-        cost = self.bprop(state_seq, action_seq, reward_seq)
-        # print 'Cost!: ', cost
+        cost, action_probs = self.bprop(state_seq, action_seq, reward_seq)
 
         self.reset_net()
         self.trajectory['states'] = []
