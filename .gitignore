@@ -2,5 +2,4 @@
 *.pyc
 
 # ignore ipython notebooks and checkpoints
-*.ipynb
 *.ipynb_checkpoints*
