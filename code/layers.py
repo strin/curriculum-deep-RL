@@ -83,11 +83,11 @@ class RNNLayer(object):
             return np.linalg.svd(A)[0]
 
         # input to hidden layer weight matrix
-        W_x_init = orth(np.random.rand(input_dim, hidden_dim) * 2 * r - r)
+        W_x_init = np.random.rand(input_dim, hidden_dim) * 2 * r - r
         self.W_x = theano.shared(value=W_x_init, name='W_x')
 
         # hidden layer to output matrix
-        W_o_init = orth(np.random.rand(hidden_dim, output_dim) * 2 * r - r)
+        W_o_init = np.random.rand(hidden_dim, output_dim) * 2 * r - r
         self.W_o = theano.shared(value=W_o_init, name='W_o')
 
         # hidden layer to hidden layer matrix
