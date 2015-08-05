@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[1]:
+# In[ ]:
 
 import scriptinit
 from gridworld import Grid, GridWorldMDP, GridWorld
@@ -12,7 +12,7 @@ import pylab as plt
 from IPython import display
 
 
-# In[2]:
+# In[ ]:
 
 # set up a very simple world with a single wall
 world = np.zeros((3, 4))
@@ -24,7 +24,7 @@ rewards = {(0, 3): 1., (1, 3): -1.}
 grid = Grid(world, action_stoch=0.2)
 
 
-# In[3]:
+# In[ ]:
 
 # Solve the grid using value iteration as a sanity check
 mdp = GridWorldMDP(grid, rewards, wall_penalty=0., gamma=0.9)
@@ -36,7 +36,7 @@ values = np.zeros(world.shape)
 for state in xrange(grid.get_num_states()):
     values[grid.state_pos[state]] = mdp_agent.V[state]
 
-expected_reward = np.mean(values)
+expected_reward = np.sum(values) / float(world.shape[0] * world.shape[1] - np.sum(world) - len(rewards))
 
 # put the terminal state rewards in for visualization purposes
 for pos, r in rewards.items():
@@ -46,7 +46,7 @@ print values
 print 'Expected reward', expected_reward
 
 
-# In[4]:
+# In[ ]:
 
 # template for interaction between the agent and the task
 def grid_experiment(agent, task, num_episodes, diagnostic_callback=None, diagnostic_frequency=100):
@@ -72,7 +72,7 @@ def grid_experiment(agent, task, num_episodes, diagnostic_callback=None, diagnos
                 diagnostic_callback(episode, total_reward)
 
 
-# In[32]:
+# In[ ]:
 
 # Solve gridworld using a DQN
 
@@ -127,14 +127,14 @@ class plot_historical_avg():
 #         self.running_avg_reward += (1. / (episode + 1)) * (total_reward - self.running_avg_reward)
 #         self.avg_reward_hist.append(self.running_avg_reward)
         self.reward_hist.append(total_reward)
-        if episode % 25 == 0:
+        if episode % 10 == 0:
             self.moving_avg_reward.append(np.mean(self.reward_hist))
             # clear history
             self.reward_hist = []
             self.episodes.append(episode)
            
             # plotting
-            plt.plot(self.episodes, expected_reward * )
+            plt.plot(self.episodes, expected_reward * np.ones(len(self.episodes)), 'r')
             plt.plot(self.episodes, self.moving_avg_reward, 'b')
             plt.xlabel('Iterations')
             plt.ylabel('Average Reward')
