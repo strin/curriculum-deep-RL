@@ -54,6 +54,15 @@ class MSE(object):
         self.output = T.mean(T.sqr(inputs - targets))
 
 
+class SoftMax(object):
+    def __init__(self, inputs):
+        self.inputs = inputs
+        # self.outputs = T.nnet.softmax(self.inputs)
+        e_x = T.exp(self.inputs - self.inputs.max(axis=1, keepdims=True))
+        currentLayerValues = e_x / e_x.sum(axis=1, keepdims=True)
+        self.outputs = currentLayerValues
+
+
 class RNNLayer(object):
     def __init__(self, input_dim, hidden_dim, output_dim,
                  hidden_activation='relu', output_activation=None):
@@ -65,17 +74,24 @@ class RNNLayer(object):
         '''
         self.hidden_activation = hidden_activation
         self.output_activation = output_activation
+        r = 0.001
+
+        def orth(A):
+            '''
+                Returns an orthonormal basis for A
+            '''
+            return np.linalg.svd(A)[0]
+
         # input to hidden layer weight matrix
-        std_dev = np.sqrt(2. / input_dim)
-        W_x_init = std_dev * np.random.randn(input_dim, hidden_dim)
+        W_x_init = orth(np.random.rand(input_dim, hidden_dim) * 2 * r - r)
         self.W_x = theano.shared(value=W_x_init, name='W_x')
 
         # hidden layer to output matrix
-        W_o_init = 0.01 * np.random.randn(hidden_dim, output_dim)
+        W_o_init = orth(np.random.rand(hidden_dim, output_dim) * 2 * r - r)
         self.W_o = theano.shared(value=W_o_init, name='W_o')
 
         # hidden layer to hidden layer matrix
-        W_h_init = std_dev * np.random.randn(hidden_dim, hidden_dim)
+        W_h_init = orth(np.random.rand(hidden_dim, hidden_dim) * 2 * r - r)
         self.W_h = theano.shared(value=W_h_init, name='W_h')
 
         # biases
