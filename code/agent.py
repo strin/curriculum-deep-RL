@@ -365,7 +365,7 @@ class Trajectory(object):
 class RecurrentReinforceAgent(OnlineAgent):
     ''' Policy Gradient with a LSTM function approximator '''
     def __init__(self, task, hidden_dim=1024, truncate_gradient=-1, num_samples=5,
-                 max_trajectory_length=float('inf'), options=None):
+                 max_trajectory_length=float('inf'), mode=None, options=None):
         self.task = task
         self.state_dim = task.get_state_dimension()  # input dimensionaliy
         self.num_actions = task.get_num_actions()  # softmax output dimensionality
@@ -381,6 +381,14 @@ class RecurrentReinforceAgent(OnlineAgent):
         self.num_samples = num_samples
         self.curr_traj_idx = 0
         self.trajectories = [Trajectory()]
+
+        # theano compilation directives
+        if mode is None:
+            self.mode = 'FAST_RUN'
+        elif mode is 'fast_compile':
+            self.mode = 'FAST_COMPILE'
+        else:
+            raise NotImplementedError()
 
         self._initialize_net()
 
@@ -419,7 +427,8 @@ class RecurrentReinforceAgent(OnlineAgent):
         print 'Compiling fprop'
         step_updates = [(h, next_h), (cell, next_cell)]
         self.fprop = theano.function(inputs=[curr_state], outputs=action_probs,
-                                     updates=step_updates, name='fprop')
+                                     updates=step_updates, name='fprop',
+                                     mode=self.mode)
 
         # backprop is more involved... we use REINFORCE to compute a descent
         # direction
@@ -463,17 +472,19 @@ class RecurrentReinforceAgent(OnlineAgent):
         self.bprop = theano.function(inputs=[state_sequences, action_sequences,
                                              reward_sequences],
                                      outputs=[cost, action_probs],
-                                     updates=updates, name='bprop')
+                                     updates=updates, name='bprop',
+                                     mode=self.mode)
 
         # reset the hidden layer and the memory cell
         print 'Compiling reset'
         reset_updates = lstm_layer.reset(h, cell)
-        self.reset_net = theano.function(inputs=[], updates=reset_updates)
+        self.reset_net = theano.function(inputs=[], updates=reset_updates,
+                                         mode=self.mode)
 
     def _get_baseline(self, state_sequences, action_sequences, rewards):
         '''
             TODO: Currently the baseline only depends on the state sequence
-                  and not the action sequence!!!!
+                  and not the action sequence!
 
                   To make this change, need to get a one-hot representation
                   of the actions. And use a new state representation that
