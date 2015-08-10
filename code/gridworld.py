@@ -166,7 +166,6 @@ class GridWorld(environment.Task):
 
         agent_state = np.zeros_like(self.env.grid)
         agent_state[self.env.state_pos[self.env.get_current_state()]] = 1.0
-        # return np.concatenate((agent_state.ravel(), self.env.grid.ravel())).reshape(-1, 1)
         return agent_state.ravel().reshape(-1, 1)
 
     def perform_action(self, action):
@@ -177,7 +176,6 @@ class GridWorld(environment.Task):
         if not self.tabular:
             agent_state = np.zeros_like(self.env.grid)
             agent_state[self.env.state_pos[next_state]] = 1.0
-            # next_state = np.concatenate((agent_state.ravel(), self.env.grid.ravel())).reshape(-1, 1)
             next_state = agent_state.ravel().reshape(-1, 1)
 
         return (next_state, reward)
