@@ -56,7 +56,14 @@ def grid_experiment(agent, task, num_episodes, diagnostic_callback=None, diagnos
             grid_task.reset()
 
         curr_state = grid_task.get_current_state()
+        num_steps = 0.
         while True:
+            num_steps += 1
+            if num_steps > 200:
+                print 'Lying and tell the agent the episode is over!'
+                agent.end_episode(0)
+                num_steps = 0.
+
             action = agent.get_action(curr_state)
             next_state, reward = grid_task.perform_action(action)
             total_reward += reward
@@ -79,11 +86,11 @@ def grid_experiment(agent, task, num_episodes, diagnostic_callback=None, diagnos
 # setup task and agent
 NUM_EPISODES = 5001
 grid_task = GridWorld(grid, rewards, wall_penalty=0., gamma=0.9, tabular=False)
-dqn = DQN(grid_task, hidden_dim=128, l2_reg=0.0, lr=0.05, epsilon=0.1)
+dqn = DQN(grid_task, hidden_dim=128, l2_reg=0.0, lr=0.05, epsilon=0.15)
 
 # diagnostic function
 def compute_value_function(episode, total_reward):
-    print 'Episode number, ' episode
+    print 'Episode number: ',  episode
     values = np.zeros(world.shape)
     for row in xrange(world.shape[0]):
         for col in xrange(world.shape[1]):
@@ -92,7 +99,7 @@ def compute_value_function(episode, total_reward):
                 agent_state[row, col] = 1.
                 state = agent_state.ravel().reshape(-1, 1)
 
-                qvals = dqn.fprop(state)
+                qvals = dqn.fprop(state.T)
                 values[row, col] = np.max(qvals)
 
     for pos, r in rewards.items():
@@ -109,9 +116,10 @@ grid_experiment(dqn, grid_task, NUM_EPISODES, diagnostic_callback=compute_value_
 # Solve gridworld using the recurrent reinforce agent (policy gradient)
 
 # setup new task and agent
-NUM_EPISODES = 4001
+NUM_EPISODES = 10001
+grid = Grid(world, action_stoch=0.2)
 grid_task = GridWorld(grid, rewards, wall_penalty=0., gamma=0.9, tabular=False)
-rr_agent = RecurrentReinforceAgent(grid_task, hidden_dim=1024)
+rr_agent = RecurrentReinforceAgent(grid_task, hidden_dim=128, num_samples=10)
 
 
 # define diagnostic function (maintains internal state)
@@ -127,7 +135,7 @@ class plot_historical_avg():
 #         self.running_avg_reward += (1. / (episode + 1)) * (total_reward - self.running_avg_reward)
 #         self.avg_reward_hist.append(self.running_avg_reward)
         self.reward_hist.append(total_reward)
-        if episode % 10 == 0:
+        if episode % 50 == 0:
             self.moving_avg_reward.append(np.mean(self.reward_hist))
             # clear history
             self.reward_hist = []
@@ -138,18 +146,13 @@ class plot_historical_avg():
             plt.plot(self.episodes, self.moving_avg_reward, 'b')
             plt.xlabel('Iterations')
             plt.ylabel('Average Reward')
-            plt.title('Average Reward over The Last 50 time steps versus Iteration')
+            plt.title('Average Reward over The Last 30 time steps versus Iteration')
             display.display(plt.gcf())
-            display.clear_output(wait=True)
+#             display.clear_output(wait=True)
 
     
 historical_averager = plot_historical_avg()
 
 # run the experiment!
 grid_experiment(rr_agent, grid_task, NUM_EPISODES, diagnostic_callback=historical_averager, diagnostic_frequency=1)
-
-
-# In[ ]:
-
-
 
