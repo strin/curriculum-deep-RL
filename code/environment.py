@@ -14,9 +14,8 @@ class Environment(object):
         raise NotImplementedError()
 
     def get_allowed_actions(self, state):
-        # optional method to return a subset of the actions based on the
-        # current state
-        return self.get_max_allowed_actions()
+        # Return a subset of the actions based on the current state
+        raise NotImplementedError()
 
     def get_current_state(self):
         # return the current state
