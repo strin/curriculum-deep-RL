@@ -4,7 +4,7 @@ class Environment(object):
         # returns the number of state for a tabular representation
         raise NotImplementedError()
 
-    def ti(self):
+    def get_state_dimension(self):
         # returns the dimension of each observation for use with a neural
         # network function approximator
         raise NotImplementedError()
