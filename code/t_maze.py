@@ -42,7 +42,7 @@ class TMaze(environment.Environment):
 
         return self.junction
 
-    def get_starting_state(self):
+    def get_start_state(self):
         if self.goal is 'left':
             return self.left
         else:
@@ -70,7 +70,7 @@ class TMaze(environment.Environment):
             else:
                 next_state = 'left'
 
-        if next_state > 0:
+        if next_state >= 0:
             self.current_state = next_state
 
         return self.get_current_state()  # returns the correct state representation
@@ -86,7 +86,7 @@ class TMazeTask(environment.Task):
         self.env = tmaze
         self.gamma = gamma
 
-    def get_starting_state(self):
+    def get_start_state(self):
         return self.env.get_start_state()
 
     def reset(self):
@@ -98,7 +98,7 @@ class TMazeTask(environment.Task):
 
         reward = 0.
         if next_state is None:  # reached a terminal state
-            if self.env.current_state == self.goal:
+            if self.env.current_state == self.env.goal:
                 reward = 4  # agent took the correct action!
             else:
                 reward = -0.1
