@@ -21,7 +21,7 @@ class Environment(object):
         # return the current state
         raise NotImplementedError()
 
-    def get_starting_state(self):
+    def get_start_state(self):
         # Note: initial state may be stochastic!
         raise NotImplementedError()
 
