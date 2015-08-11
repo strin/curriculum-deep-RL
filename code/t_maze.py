@@ -3,7 +3,7 @@ import environment
 import numpy as np
 
 
-class TMaze(environment.environment):
+class TMaze(environment.Environment):
 
     left = np.asarray([[0], [1], [1]])
     right = np.asarray([[1], [1], [0]])
@@ -80,11 +80,14 @@ class TMaze(environment.environment):
         self.goal = random.choice(['left', 'right'])
 
 
-class TMazeTask(environment.task):
+class TMazeTask(environment.Task):
 
     def __init__(self, tmaze, gamma=0.98):
         self.env = tmaze
         self.gamma = gamma
+
+    def get_starting_state(self):
+        return self.env.get_start_state()
 
     def reset(self):
         self.env.reset()
