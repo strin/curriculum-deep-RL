@@ -4,12 +4,12 @@
 # In[ ]:
 
 import scriptinit
-from gridworld import Grid, GridWorldMDP, GridWorld
-from agent import ValueIterationSolver, TDLearner, DQN, RecurrentReinforceAgent
 import numpy as np
 import matplotlib
 import pylab as plt
 from IPython import display
+from gridworld import Grid, GridWorldMDP, GridWorld
+from agent import ValueIterationSolver, TDLearner, DQN, RecurrentReinforceAgent
 
 
 # In[ ]:
