@@ -90,8 +90,9 @@ class HyperCubeMazeTask(environment.Task):
         self.visited = []  # goals we've visited
 
     def _get_goals(self):
-        possible_goals = list(itertools.product(*zip([0] *
-                              len(self.env.dimensions), self.env.dimensions)))
+        maximums = [max_dim - 1 for max_dim in self.env.dimensions]
+	possible_goals = list(itertools.product(*zip([0] *
+                              len(self.env.dimensions), maximums)))
         goals = []
         for idx in xrange(len(self.goal_vec)):
             if self.goal_vec[idx]:
