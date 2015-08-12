@@ -4,6 +4,7 @@ import theano
 import theano.tensor as T
 import layers
 import optimizers
+import util
 
 
 class OnlineAgent(object):
@@ -362,6 +363,7 @@ class Trajectory(object):
         return len(self.states)
 
 
+#@util.memoize
 class RecurrentReinforceAgent(OnlineAgent):
     ''' Policy Gradient with a LSTM function approximator '''
     def __init__(self, task, hidden_dim=1024, truncate_gradient=-1, num_samples=5,
