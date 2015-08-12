@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[35]:
+# In[ ]:
 
 import scriptinit
 import numpy as np
@@ -12,7 +12,7 @@ from hypercube import *
 from agent import RecurrentReinforceAgent
 
 
-# In[36]:
+# In[ ]:
 
 # set-up a simple 2-D cube
 dimensions = (5, 5, 5)
@@ -21,7 +21,7 @@ maze = HyperCubeMaze(dimensions=dimensions, action_stoch=0., grid=walls)
 task = HyperCubeMazeTask(maze, wall_penalty=-0.1, time_penalty=0., reward=4., gamma=0.9)
 
 
-# In[37]:
+# In[ ]:
 
 # set a simple 2-corner goal
 goal_vec = np.zeros((8, 1))
@@ -30,13 +30,13 @@ goal_vec[4] = 1.
 task.set_goals(goal_vec)
 
 
-# In[38]:
+# In[ ]:
 
 # initialize the agent
 rr_agent = RecurrentReinforceAgent(task, hidden_dim=128, num_samples=10)
 
 
-# In[39]:
+# In[ ]:
 
 # set-up the experiment
 def experiment(agent, task, NUM_EPISODES):
@@ -75,7 +75,7 @@ def experiment(agent, task, NUM_EPISODES):
 
 
 
-# In[40]:
+# In[ ]:
 
 # run the experiment
 print experiment(rr_agent, task, NUM_EPISODES=20000)
