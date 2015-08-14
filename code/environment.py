@@ -119,3 +119,10 @@ class Task(object):
     def get_reward(self, state, action, next_state):
         # returns the reward based on the (s, a, s') triple
         raise NotImplementedError()
+
+    def visualize(self):
+        '''
+            Returns a matrix that can visualize the current state of the game
+            board.
+        '''
+        pass

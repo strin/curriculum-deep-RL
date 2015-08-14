@@ -1,7 +1,7 @@
 import environment
 import numpy as np
 import itertools
-import copy
+import matplotlib
 
 
 class HyperCubeMaze(environment.Environment):
@@ -136,3 +136,38 @@ class HyperCubeMazeTask(environment.Task):
             return self.reward
 
         return self.time_penalty
+
+    def visualize(self):
+        '''
+            Visualize the current game board.
+        '''
+        if len(self.env.grid.shape) > 2:
+            raise NotImplementedError()
+
+        self.cmap = matplotlib.colors.ListedColormap(['grey', 'black', 'blue', 'green', 'yellow', 'red'])
+        self.color_norm = matplotlib.colors.BoundaryNorm(range(7), 6)
+
+        world = np.copy(self.env.grid)  # assume walls are 1
+
+        # show the location of the agent
+        location = self.env.get_current_state()
+
+        marked = False
+        for goal in self.goals:
+            if goal not in self.visited:
+                if location == goal:
+                    world[goal] = 3
+                    marked = True
+                else:
+                    world[goal] = 4  # not yet visited
+            else:
+                if location == goal:
+                    world[goal] = 3
+                    marked = True
+                else:
+                    world[goal] = 5
+
+        if not marked:
+            world[location] = 2
+
+        return world

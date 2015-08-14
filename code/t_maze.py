@@ -1,6 +1,7 @@
 import random
 import environment
 import numpy as np
+import matplotlib
 
 
 class TMaze(environment.Environment):
@@ -107,3 +108,41 @@ class TMazeTask(environment.Task):
             reward = -0.1  # agent stood still
 
         return (next_state, reward)
+
+    def visualize(self):
+        '''
+            Visualize the current game board.
+        '''
+        self.cmap = matplotlib.colors.ListedColormap(['black', 'grey', 'blue', 'green', 'red'])
+        self.color_norm = matplotlib.colors.BoundaryNorm(range(6), 5)
+
+        # construct the game board
+        world = np.zeros((3, self.env.length + 1))
+        world[0, :-1] = 0
+        world[2, :-1] = 0
+
+        world[1, :-1] = 1
+        world[:, -1] = 1
+
+         # show the position of the agent
+        curr_pos = self.env.current_state
+        if curr_pos == 'left':
+            if self.env.goal == 'left':
+                world[0, -1] = 4
+            else:
+                world[0, -1] = 2
+                world[2, -1] = 3
+        elif curr_pos == 'right':
+            if self.env.goal == 'right':
+                world[2, -1] = 4
+            else:
+                world[2, -1] = 2
+                world[0, -1] = 3
+        else:
+            world[1, curr_pos] = 2
+            if self.env.goal == 'left':
+                world[0, -1] = 3
+            else:
+                world[2, -1] = 3
+
+        return world
