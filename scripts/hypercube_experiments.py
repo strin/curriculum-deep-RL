@@ -1,42 +1,44 @@
 
 # coding: utf-8
 
-# In[ ]:
+# In[128]:
 
 import scriptinit
 import numpy as np
 import matplotlib
 import pylab as plt
 from IPython import display
+import diagnostics
 from hypercube import *
 from agent import RecurrentReinforceAgent
 
 
-# In[ ]:
+# In[129]:
 
 # set-up a simple 2-D cube
-dimensions = (5, 5, 5)
-walls = np.zeros(dimensions)
-maze = HyperCubeMaze(dimensions=dimensions, action_stoch=0., grid=walls)
-task = HyperCubeMazeTask(maze, wall_penalty=-0.1, time_penalty=0., reward=4., gamma=0.9)
+dimensions = (10, 10)
+world = np.zeros(dimensions)
+maze = HyperCubeMaze(dimensions=dimensions, action_stoch=0., grid=world)
+task = HyperCubeMazeTask(maze, wall_penalty=-0.1, time_penalty=-0.1, reward=4., gamma=0.9)
 
 
-# In[ ]:
+# In[130]:
 
 # set a simple 2-corner goal
-goal_vec = np.zeros((8, 1))
+goal_vec = np.zeros((4, 1))
 goal_vec[0] = 1.
-goal_vec[4] = 1.
+goal_vec[3] = 1.
 task.set_goals(goal_vec)
+goals = task.goals
 
 
-# In[ ]:
+# In[119]:
 
 # initialize the agent
 rr_agent = RecurrentReinforceAgent(task, hidden_dim=128, num_samples=10)
 
 
-# In[ ]:
+# In[120]:
 
 # set-up the experiment
 def experiment(agent, task, NUM_EPISODES):
@@ -75,10 +77,24 @@ def experiment(agent, task, NUM_EPISODES):
 
 
 
-# In[ ]:
+# In[121]:
 
 # run the experiment
-print experiment(rr_agent, task, NUM_EPISODES=20000)
+print experiment(rr_agent, task, NUM_EPISODES=200)
+
+
+# In[ ]:
+
+env = np.copy(world)
+for goal in goals:
+    env[goal] = 10
+
+diagnostics.visualize_sample_trajectory(rr_agent, task, env)
+
+
+# In[ ]:
+
+
 
 
 # In[ ]:
