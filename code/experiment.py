@@ -10,16 +10,16 @@ import util
 class Experiment(object):
     def __init__(self, agent, task, controllers=None, observers=None):
         '''
-
-         Basic idea. Make this like online maximizer, which was the heart of the KBC
-         experiment. Have a tight loop around act, learn, etc... but with the
-         ability to add controllers
+            Designed to be similar to OnlineMaximizer, but specifically targeted
+            for reinforcement learning experiments
         '''
 
         # CORE INPUTS
         # ------------
         self.agent = agent
         self.task = task
+
+        self.halt = False
 
         # TRACKING
         # ----- ----- ----- ----- -----
@@ -42,7 +42,7 @@ class Experiment(object):
                 continue
             for name, val in metrics.iteritems():
                 timestamps, values = self.history[name]
-                timestamps.append(self.steps)
+                timestamps.append(self.total_steps)
                 values.append(val)
 
                 util.metadata(name, val)
@@ -145,6 +145,7 @@ class BasicController(Controller):
         if experiment.num_episodes % self.save_wait == 0 and experiment.num_episodes != 0:
             print 'saving params...'
             experiment.agent.save_params('params.cpkl')
+
 
 class AverageRewardObserver(Observer):
     def __init__(self, report_wait=10):
