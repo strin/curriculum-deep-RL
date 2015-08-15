@@ -23,7 +23,7 @@ class Environment(object):
 
     def get_start_state(self):
         # Note: initial state may be stochastic!
-        raise NotImplementedError()
+        return self.get_current_state()
 
     def perform_action(self, action):
         # performs the specified action and updates the internal state of
@@ -95,6 +95,9 @@ class Task(object):
 
     def get_current_state(self):
         return self.env.get_current_state()
+
+    def get_start_state(self):
+        return self.env.get_start_state()
 
     def get_gamma(self):
         return self.gamma()
