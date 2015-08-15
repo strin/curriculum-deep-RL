@@ -4,7 +4,7 @@ import theano
 import theano.tensor as T
 import layers
 import optimizers
-import util
+import cPickle as pickle
 
 
 class OnlineAgent(object):
@@ -190,7 +190,7 @@ class DQN(OnlineAgent):
         self.memory_size = memory_size  # number of experiences to store
         self.minibatch_size = minibatch_size
 
-        self._initialize_net()
+        self.model = self._initialize_net()
 
         # for now, keep experience as a list of tuples
         self.experience = []
@@ -218,6 +218,8 @@ class DQN(OnlineAgent):
         linear_layer = layers.FullyConnected(input_dim=self.hidden_dim,
                                              output_dim=self.num_actions,
                                              activation=None)
+
+        model = {'fc1': fc1, 'fc2': fc2, 'linear': linear_layer}
 
         # construct computation graph for forward pass
         states = T.matrix('states')
@@ -252,7 +254,7 @@ class DQN(OnlineAgent):
         self.bprop = theano.function(inputs=[states, last_actions, targets],
                                      outputs=td_errors, updates=updates)
 
-        return params
+        return model
 
     def end_episode(self, reward):
         if self.last_state is not None:
@@ -333,6 +335,21 @@ class DQN(OnlineAgent):
                                 next_state, reward)
         self._update_net()
 
+    def save_params(self, path):
+        assert path is not None
+        print 'Saving params to ', path
+        params = {}
+        for name, layer in self.model.iteritems():
+            params[name] = layer.get_params()
+        pickle.dump(params, file(path, 'wb'), protocol=pickle.HIGHEST_PROTOCOL)
+
+    def load_params(self, path):
+        assert path is not None
+        print 'Restoring params from ', path
+        params = pickle.load(file(path, 'r'))
+        for name, layer in self.model.iteritems():
+            layer.set_params(params[name])
+
 
 class Trajectory(object):
     def __init__(self):
@@ -392,7 +409,7 @@ class RecurrentReinforceAgent(OnlineAgent):
         else:
             raise NotImplementedError()
 
-        self._initialize_net()
+        self.model = self._initialize_net()
 
         # used for streaming updates
         self.last_state = None
@@ -408,6 +425,8 @@ class RecurrentReinforceAgent(OnlineAgent):
         # initialize Reinforce layers
         lstm_layer = layers.LSTMLayer(self.state_dim, self.hidden_dim)
         fc_layer = layers.FullyConnected(self.hidden_dim, self.num_actions)
+
+        model = {'lstm_layer': lstm_layer, 'fc_layer': fc_layer}
 
         # build the Reinforce computation graph for a single time step
         def reinforce_step(state, h, prev_memory_cell):
@@ -463,10 +482,10 @@ class RecurrentReinforceAgent(OnlineAgent):
 
         # baselines is a matrix with baseline[i, j] = baseline for sample i
         # at time j
-        baselines, updates = self._get_baseline(state_sequences, action_sequences, rewards)
+        baselines, updates = self._get_baseline(state_sequences, action_sequences, rewards, model)
 
         # take a gradient descent step for the reinforce agent
-        cost = -T.sum(log_action_probs * rewards - baselines) / num_trajectories
+        cost = -T.sum(log_action_probs * (rewards - baselines)) / num_trajectories
         params = lstm_layer.params + fc_layer.params
         updates += optimizers.Adam(cost, params)
 
@@ -483,7 +502,9 @@ class RecurrentReinforceAgent(OnlineAgent):
         self.reset_net = theano.function(inputs=[], updates=reset_updates,
                                          mode=self.mode)
 
-    def _get_baseline(self, state_sequences, action_sequences, rewards):
+        return model
+
+    def _get_baseline(self, state_sequences, action_sequences, rewards, model):
         '''
             TODO: Currently the baseline only depends on the state sequence
                   and not the action sequence!
@@ -497,6 +518,9 @@ class RecurrentReinforceAgent(OnlineAgent):
                                                self.hidden_dim)
         baseline_fc_layer = layers.FullyConnected(self.hidden_dim, 1)
 
+        model['baseline_lstm'] = baseline_lstm_layer
+        model['baseline_fc'] = baseline_fc_layer
+
         # build the baseline computation graph
         def baseline_step(state, h, prev_memory_cell):
             # concatenate the current state and the previous action
@@ -509,7 +533,7 @@ class RecurrentReinforceAgent(OnlineAgent):
         [hidden_states, memory_cells, reward_estimates], _ = theano.scan(
             fn=baseline_step,
             sequences=state_sequences,
-            outputs_info=[T.extra_ops.repeat(baseline_lstm_layer.h0,
+            outputs_info=[T.extra_ops.repeat(T.tanh(baseline_lstm_layer.cell_0),
                                              state_sequences.shape[1], axis=0),
                           T.extra_ops.repeat(baseline_lstm_layer.cell_0,
                                              state_sequences.shape[1], axis=0),
@@ -609,3 +633,20 @@ class RecurrentReinforceAgent(OnlineAgent):
             self.trajectories[self.curr_traj_idx].add_sample(self.last_state,
                                                              self.last_action,
                                                              reward)
+
+    def save_params(self, path):
+        assert path is not None
+        print 'Saving params to ', path
+        params = {}
+        for name, layer in self.model.iteritems():
+            params[name] = layer.get_params()
+        pickle.dump(params, file(path, 'wb'), protocol=pickle.HIGHEST_PROTOCOL)
+
+    def load_params(self, path):
+        assert path is not None
+        print 'Restoring params from ', path
+        params = pickle.load(file(path, 'r'))
+        for name, layer in self.model.iteritems():
+            layer.set_params(params[name])
+
+        self.reset_net()
