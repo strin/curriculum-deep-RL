@@ -43,6 +43,17 @@ class FullyConnected(object):
         # set-up the outputs
         return self.act(inputs.dot(self.W) + self.b)
 
+    def get_params(self):
+        params = {}
+        for p in self.params:
+            params[p.name] = p.get_value()
+        return params
+
+    def set_params(self, params):
+        for p in self.params:
+            p.set_value(params[p.name], borrow=True)
+
+
 
 def orth(A):
     '''
@@ -113,6 +124,16 @@ class RNNLayer(object):
                                           self.output_activation)
 
         return [new_h, output]
+
+    def get_params(self):
+        params = {}
+        for p in self.params:
+            params[p.name] = p.get_value()
+        return params
+
+    def set_params(self, params):
+        for p in self.params:
+            p.set_value(params[p.name], borrow=True)
 
 
 class LSTMLayer(object):
@@ -200,8 +221,17 @@ class LSTMLayer(object):
         '''
         # update the starting layer since we don't backprop through it
         self.h0.set_value(np.tanh(self.cell_0.get_value()))
-
         return [(h, self.h0), (cell, self.cell_0)]
+
+    def get_params(self):
+        params = {}
+        for p in self.params:
+            params[p.name] = p.get_value()
+        return params
+
+    def set_params(self, params):
+        for p in self.params:
+            p.set_value(params[p.name], borrow=True)
 
 
 #######################

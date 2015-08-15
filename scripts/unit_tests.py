@@ -7,8 +7,10 @@ import scriptinit
 import numpy as np
 import unittest
 import numpy.testing
-from agent import DQN, RecurrentReinforceAgent
+import os
 import theano
+import cPickle as pickle
+from agent import DQN, RecurrentReinforceAgent
 
 
 # In[ ]:
@@ -103,7 +105,7 @@ class ChainMDP(object):
 # Unit test for the Deep Q-Network
 ####
 
-class DQNConvergenceTest(unittest.TestCase):
+class DQNTest(unittest.TestCase):
     def setUp(self):
         self.mdp = ChainMDP()
 
@@ -117,7 +119,7 @@ class DQNConvergenceTest(unittest.TestCase):
 
     def train(self, net, steps):
         mdp = self.mdp
-        curr_state =mdp.states[np.random.randint(0, mdp.num_states-1)]
+        curr_state = mdp.states[np.random.randint(0, mdp.num_states-1)]
         for step in xrange(steps):
             action = net.get_action(curr_state)
             reward, next_state, terminal = mdp.act(curr_state, action)
@@ -129,21 +131,44 @@ class DQNConvergenceTest(unittest.TestCase):
                 curr_state = next_state
 
     def test_convergence_sgd(self):
-        dqn = DQN(self.mdp, hidden_dim=128, l2_reg=0.0, epsilon=0.2)
-        self.train(dqn, 1000)
+        dqn = DQN(self.mdp, hidden_dim=128, l2_reg=0.0, epsilon=0.05)
+        self.train(dqn, 5000)
         
         # there is a secret "5-th" state corresponding to the second visit
         # to the absorbing state (to avoid infinite looping), so only check the
         # first four states
         numpy.testing.assert_almost_equal(self.all_q_vals(dqn)[:4],
                                           [[.7, .25], [.35, .5],
-                                           [.25, 1.0], [0., 0.]], 3)
+                                           [.25, 1.0], [0., 0.]], 2)
+    
+    def test_pickle(self):
+        '''
+            Ensure the model parameters are successfully loaded and unloaded
+        '''
+        PATH = 'dqn_pickle_test.cpkl'
+        dqn_one = DQN(mdp, hidden_dim=128, l2_reg=0.0, epsilon=0.2)
+        self.train(dqn_one, 10)
+        
+        # save params
+        dqn_one.save_params(PATH)
+
+        # initialize a second dqn
+        dqn_two = DQN(mdp, hidden_dim=128, l2_reg=0.0, epsilon=0.2)
+
+        # load params
+        dqn_two.load_params(PATH)
+        
+        os.remove(PATH)
+
+        #  Verify that the output values of dqn_one and dqn_two are identical
+        numpy.testing.assert_almost_equal(self.all_q_vals(dqn_one),self.all_q_vals(dqn_two))
+        
 
 
 # In[ ]:
 
 # Testing the DQN
-suite = unittest.TestLoader().loadTestsFromTestCase(DQNConvergenceTest)
+suite = unittest.TestLoader().loadTestsFromTestCase(DQNTest)
 unittest.TextTestRunner(verbosity=2).run(suite)
 
 
@@ -180,9 +205,33 @@ class ReinforceActionTest(unittest.TestCase):
 
     def test_convergence_sgd(self):
         rr_agent = RecurrentReinforceAgent(self.mdp, hidden_dim=128, num_samples=10, mode='fast_compile')
-        self.train(rr_agent, 50000)
+        self.train(rr_agent, 30000)
         diffs = (self.all_action_distribution(rr_agent)[:4, 1] - [0.95]*4) < 0
         self.assertEqual(sum(diffs), 0)
+    
+    def test_pickle(self):
+        '''
+            Ensure the model parameters are successfully loaded and unloaded
+        '''
+        PATH = 'rr_agent_pickle_test.cpkl'
+        rr_agent_one = RecurrentReinforceAgent(self.mdp, hidden_dim=128, num_samples=10, mode='fast_compile')
+        self.train(rr_agent_one, 20)
+        
+        # save params
+        rr_agent_one.save_params(PATH)
+
+        # initialize a second dqn
+        rr_agent_two = RecurrentReinforceAgent(self.mdp, hidden_dim=128, num_samples=10, mode='fast_compile')
+
+        # load params
+        rr_agent_two.load_params(PATH)
+        
+        os.remove(PATH)
+ 
+        #  Verify that the output values of dqn_one and dqn_two are identical
+        numpy.testing.assert_almost_equal(self.all_action_distribution(rr_agent_one) ,self.all_action_distribution(rr_agent_two))
+    
+    
 
 
 # In[ ]:
