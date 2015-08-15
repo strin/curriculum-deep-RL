@@ -261,6 +261,9 @@ class DQN(OnlineAgent):
         self.last_state = None
         self.last_action = None
 
+    def get_qvals(self, state):
+        return self.fprop(state)
+
     def get_action(self, state):
         # transpose since the DQN expects row vectors
         state = state.T
