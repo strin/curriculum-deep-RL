@@ -9,11 +9,12 @@ def visualize_sample_trajectory(agent, task):
     if util.in_ipython():
         from IPython import display
     else:
+        print 'Must be inside IPython!'
         raise NotImplementedError()
 
     # sample a trajectory
     task.reset()
-    current_state = task.get_current_state()
+    current_state = task.get_start_state()
     images = [task.visualize()]
     while True:
         action = agent.get_action(current_state)
