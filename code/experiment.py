@@ -42,7 +42,7 @@ class Experiment(object):
                 continue
             for name, val in metrics.iteritems():
                 timestamps, values = self.history[name]
-                timestamps.append(self.total_steps)
+                timestamps.append(self.num_episodes)
                 values.append(val)
 
                 util.metadata(name, val)
