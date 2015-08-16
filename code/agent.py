@@ -254,6 +254,7 @@ class DQN(OnlineAgent):
         self.bprop = theano.function(inputs=[states, last_actions, targets],
                                      outputs=td_errors, updates=updates)
 
+        print 'done'
         return model
 
     def end_episode(self, reward):
@@ -505,6 +506,7 @@ class RecurrentReinforceAgent(OnlineAgent):
         self.reset_net = theano.function(inputs=[], updates=reset_updates,
                                          mode=self.mode)
 
+        print 'done'
         return model
 
     def _get_baseline(self, state_sequences, action_sequences, rewards, model):
