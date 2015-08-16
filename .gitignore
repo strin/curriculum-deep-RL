@@ -3,3 +3,6 @@
 
 # ignore ipython notebooks and checkpoints
 *.ipynb_checkpoints*
+*.json
+
+*.cpkl
