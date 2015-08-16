@@ -1,99 +1,68 @@
 
 # coding: utf-8
 
-# In[28]:
+# In[ ]:
 
 import scriptinit
 import numpy as np
-import matplotlib
-import pylab as plt
-from IPython import display
+import util
 from t_maze import *
+from experiment import *
 from agent import RecurrentReinforceAgent
 
 
-# In[29]:
+# In[ ]:
 
-# set-up a simple maze with small N
-length = 3
-maze = TMaze(length, noise=False)
-maze_task = TMazeTask(maze, gamma=0.98)
+# general parameters
+hyperparams = {
+    # task specific
+    'maze_length' : 10,
+    'noisy_observations': False,
+    'gamma': 0.98,
+
+    # model specific
+    'hidden_dimension' : 128,
+    'num_trajectory_samples' : 10,
+    'truncate_gradient' : -1,  # number of steps to run BPTT (-1 means use the whole sequence)
+    'max_trajectory_length' : float('inf'),  # the length of longest (s, a, r) sequence used
+    
+    
+    # experiment specific
+    'max_episodes' : 5000,
+    'report_wait' : 50,
+    'save_wait' : 100,
+    'experiment_samples' : 20
+}
 
 
-# In[30]:
+# load into namespace and log to metadata
+for var, val in hyperparams.iteritems():
+    exec("{0} = hyperparams['{0}']".format(var))
+    util.metadata(var, val)
+
+
+# In[ ]:
+
+# set-up the task
+maze = TMaze(length = maze_length, noise=noisy_observations)
+task = TMazeTask(maze, gamma=gamma)
 
 # initialize the agent
-rr_agent = RecurrentReinforceAgent(maze_task, hidden_dim=36, num_samples=10)
-
-
-# In[31]:
-
-# set-up the basic task
-def experiment(agent, task, MAX_EPISODES):
-    '''
-        Number of runs until first success
-    '''
-    
-    def run():
-        task.reset()
-        curr_observation = task.get_start_state()  # the initial observation (left or right)
-        steps = 0
-        while True:
-            steps += 1
-            action = agent.get_action(curr_observation)
-            next_observation, reward = task.perform_action(action)
-            if next_observation is None:
-                agent.end_episode(reward)
-                return steps, reward
-            else:
-                agent.learn(next_observation, reward)
-                curr_observation = next_observation
-                
-    def percent_successful(trials=10):
-        num_success = 0.
-        for _ in xrange(trials):
-            steps, reward = run()
-            if(reward > 0):
-                num_success += 1
-        return num_success / float(trials)
-    
-    step = 50
-    total_steps = 0.
-    episodes = []
-    success_percentages = []
-    for episode in xrange(0, MAX_EPISODES, step):
-        per_succ = percent_successful()
-        episodes.append(episode)
-        success_percentages.append(per_succ)
-
-        plt.plot(episodes, success_percentages, 'b')
-        plt.xlabel('Iterations')
-        plt.ylabel('Number of Steps')
-        plt.title('Number of Steps (Avg. over 20 episodes) to Goal Completion versus Time')
-        display.display(plt.gcf())
-        display.clear_output(wait=True)
-
-        if per_succ > .90:
-            break
-        for _ in xrange(step):
-            steps, reward = run()
-            total_steps += steps
-
-    return total_steps
-
-
-# In[33]:
-
-# run the experiment!
-experiment(rr_agent, maze_task, MAX_EPISODES=50000)
+rr_agent = RecurrentReinforceAgent(task, hidden_dim=hidden_dimension,
+                                   num_samples=num_trajectory_samples,
+                                   truncate_gradient=truncate_gradient,
+                                   max_trajectory_length=max_trajectory_length)
 
 
 # In[ ]:
 
-
+# prepare the experiment
+controllers = [BasicController(report_wait=report_wait, save_wait=save_wait, max_episodes=max_episodes)]
+observers = [TMazeObserver(num_samples=experiment_samples, report_wait=report_wait)]
+experiment = Experiment(rr_agent, task, controllers=controllers, observers=observers)
 
 
 # In[ ]:
 
-
+experiment.run_experiments()
 
