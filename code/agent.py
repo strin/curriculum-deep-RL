@@ -269,7 +269,7 @@ class DQN(OnlineAgent):
 
     def get_action(self, state):
         # transpose since the DQN expects row vectors
-        state = state.T
+        state = state.reshape(1, -1)
 
         # epsilon greedy w.r.t the current policy
         if(random.random() < self.epsilon):
@@ -614,7 +614,7 @@ class RecurrentReinforceAgent(OnlineAgent):
             Uses a soft-action selection policy, where each action is
             selected according with probability p(a_t \mid s_{1:t}, a_{1:t-1})
         '''
-        state = state.T  # states are stored as row-vectors
+        state = state.reshape(1, -1)  # states are stored as row-vectors
         action_probs = self.fprop(state).flatten()
         action = np.random.choice(np.arange(self.num_actions), p=action_probs)
         self.last_state = state
