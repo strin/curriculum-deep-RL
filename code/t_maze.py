@@ -2,6 +2,7 @@ import random
 import environment
 import numpy as np
 import matplotlib
+from experiment import Observer
 
 
 class TMaze(environment.Environment):
@@ -146,3 +147,44 @@ class TMazeTask(environment.Task):
                 world[2, -1] = 3
 
         return world
+
+
+class TMazeObserver(Observer):
+    '''
+        Assumes the task is the t-shaped maze task and reports percent
+        success and average numver of steps on NUM_SAMPLES trials.
+    '''
+    def __init__(self, num_samples=10, report_wait=10):
+        self.report_wait = report_wait  # number of episodes to average reward over
+        self.num_samples = num_samples
+
+    def observe(self, experiment):
+        if experiment.num_episodes % self.report_wait == 0:
+
+            def trial():
+                experiment.task.reset()
+                curr_obs = experiment.task.get_start_state()
+                steps = 1
+                while True:
+                    act = experiment.agent.get_action(curr_obs)
+                    next_obs, reward = experiment.task.perform_action(act)
+                    if experiment.task.is_terminal():
+                        return steps, reward
+
+                    steps += 1
+                    curr_obs = next_obs
+
+            step_history = []
+            success_history = []
+            for _ in xrange(self.num_samples):
+                steps, final_reward = trial()
+                step_history.append(steps)
+                success_history.append(final_reward > 0)
+
+            percent_success = np.mean(success_history)
+            avg_steps = np.mean(step_history)
+
+            return {('percent_success', 'percent_success'): percent_success,
+                    ('avg_steps', 'avg_steps'): avg_steps}
+
+        return None

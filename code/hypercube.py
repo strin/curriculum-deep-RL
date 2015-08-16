@@ -2,6 +2,7 @@ import environment
 import numpy as np
 import itertools
 import matplotlib
+from experiment import Observer
 
 
 class HyperCubeMaze(environment.Environment):
@@ -91,7 +92,7 @@ class HyperCubeMazeTask(environment.Task):
 
     def _get_goals(self):
         maximums = [max_dim - 1 for max_dim in self.env.dimensions]
-	possible_goals = list(itertools.product(*zip([0] *
+        possible_goals = list(itertools.product(*zip([0] *
                               len(self.env.dimensions), maximums)))
         goals = []
         for idx in xrange(len(self.goal_vec)):
@@ -110,6 +111,9 @@ class HyperCubeMazeTask(environment.Task):
     def _get_state_vector(self, state):
         location = np.asarray(state).reshape(-1, 1)
         return np.concatenate([location, self.goal_vec])
+
+    def get_start_state(self):
+        return self._get_state_vector(self.env.get_start_state())
 
     def get_current_state(self):
         return self._get_state_vector(self.env.get_current_state())
@@ -171,3 +175,24 @@ class HyperCubeMazeTask(environment.Task):
             world[location] = 2
 
         return world
+
+
+class HyperCubeObserver(Observer):
+    '''
+        Assumes the task is the hypercube task and report average number
+        of steps to completion.
+    '''
+    def __init__(self, report_wait=10):
+        self.report_wait = report_wait  # number of episodes to average steps
+        self.step_history = []  # steps to completion of the task
+
+    def observe(self, experiment):
+        self.step_history.append(experiment.episode_steps)
+
+        if experiment.num_episodes % self.report_wait == 0:
+            avg_steps = np.mean(self.step_history)
+            self.step_history = []
+
+            return {('avg_steps_to_completion', 'avg_steps_to_completion'): avg_steps}
+
+        return None
