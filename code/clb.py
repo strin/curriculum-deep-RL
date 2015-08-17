@@ -11,7 +11,7 @@ import util
 __author__ = 'Kelvin Gu'
 
 
-worksheet = 'nlp::millerjp'
+worksheet = 'nlp::rl'
 site = 'http://localhost:18000'
 
 
@@ -86,9 +86,7 @@ def default_render(bundle):
     # print metadata
     print bundle
     print '{}/bundles/{}/'.format(site, bundle.uuid)
-    for key in 'name state time remote uuid gb_used dataset augment ' \
-               'warm_start wvec_dim batch_size step_size steps l2_reg ' \
-               'mean_rank kbc positive_branch_factor'.split():
+    for key in 'name state time remote uuid gb_used'.split():
         try:
             val = bundle.meta[key]
             if key in ('uuid', 'remote'):
