@@ -164,7 +164,7 @@ class AverageRewardObserver(Observer):
 
 
 class AverageQValueObserver(Observer):
-    def __init__(self, task_samples, report_wait=30):
+    def __init__(self, task_samples=100, report_wait=30):
         self.task_samples = task_samples  # number of states to randomly sample
         self.report_wait = report_wait
         self.states = []
@@ -184,7 +184,7 @@ class AverageQValueObserver(Observer):
             while True:
                 rand_action = np.random.randint(num_actions)
                 next_state, reward = experiment.task.perform_action(rand_action)
-                if self.task.is_terminal():
+                if experiment.task.is_terminal():
                     break
                 self.states.append(next_state)
 
@@ -196,6 +196,7 @@ class AverageQValueObserver(Observer):
                 qvals = []
                 for state in states:
                     qvals.append(np.max(experiment.agent.get_qvals(state)))
+
                 return np.mean(qvals)
 
             return {('average_q_val', 'average_q_val'): qval_mean(self.states)}
