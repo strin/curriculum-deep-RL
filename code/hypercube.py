@@ -70,14 +70,15 @@ class HyperCubeMaze(environment.Environment):
 class HyperCubeMazeTask(environment.Task):
 
     def __init__(self, hypercubemaze, wall_penalty=-0.1, time_penalty=0.,
-                 reward=4., gamma=0.9):
+                 reward=4., gamma=0.9, fully_observed=False):
         self.env = hypercubemaze
         self.gamma = gamma
+        self.fully_observed = fully_observed
 
         # keeps track of goal. Set via SET_GOALS
         self.goal_vec = None
         self.goals = []
-        self.visited = []
+        self.remaining_vec = None
 
         self.wall_penalty = wall_penalty  # reward for hitting a wall
         self.time_penalty = time_penalty  # reward earned on steps without action
@@ -88,16 +89,16 @@ class HyperCubeMazeTask(environment.Task):
         assert(2 ** len(self.env.dimensions) == len(goal_vec))
         self.goal_vec = goal_vec
         self.goals = self._get_goals()
-        self.visited = []  # goals we've visited
+        self.remaining_vec = np.copy(goal_vec)  # goals we've visited
 
     def _get_goals(self):
         maximums = [max_dim - 1 for max_dim in self.env.dimensions]
         possible_goals = list(itertools.product(*zip([0] *
                               len(self.env.dimensions), maximums)))
-        goals = []
+        goals = {}
         for idx in xrange(len(self.goal_vec)):
             if self.goal_vec[idx]:
-                goals.append(possible_goals[idx])
+                goals[possible_goals[idx]] = idx
 
         return goals
 
@@ -105,12 +106,17 @@ class HyperCubeMazeTask(environment.Task):
         if self.goal_vec is None:
             print 'Must set a goal before initializing task'
             assert False
-        # for now, use the concatenation strategy
-        return self.env.get_state_dimension() + len(self.goal_vec)
+        if not self.fully_observed:
+            return self.env.get_state_dimension() + len(self.goal_vec)
+        else:
+            return self.env.get_state_dimension() + 2 * len(self.goal_vec)
 
     def _get_state_vector(self, state):
         location = np.asarray(state).reshape(-1, 1)
-        return np.concatenate([location, self.goal_vec])
+        if not self.fully_observed:
+            return np.concatenate([location, self.goal_vec])
+        else:
+            return np.concatenate([location, self.goal_vec, self.remaining_vec])
 
     def get_start_state(self):
         return self._get_state_vector(self.env.get_start_state())
@@ -120,7 +126,7 @@ class HyperCubeMazeTask(environment.Task):
 
     def reset(self):
         self.env.reset()
-        self.visited = []  # get points for visiting goals again!
+        self.remaining_vec = np.copy(self.goal_vec)
 
     def perform_action(self, action):
         curr_state = self.env.get_current_state()
@@ -129,14 +135,14 @@ class HyperCubeMazeTask(environment.Task):
         return (self._get_state_vector(next_state), reward)
 
     def is_terminal(self):
-        return len(set(self.goals) - set(self.visited)) == 0.
+        return np.sum(self.remaining_vec) == 0.
 
     def get_reward(self, state, action, next_state):
         if state == next_state:
             return self.wall_penalty
 
-        if next_state in self.goals and next_state not in self.visited:
-            self.visited.append(next_state)
+        if next_state in self.goals and self.remaining_vec[self.goals[next_state]] == 1:
+            self.remaining_vec[self.goals[next_state]] = 0.
             return self.reward
 
         return self.time_penalty
@@ -145,6 +151,7 @@ class HyperCubeMazeTask(environment.Task):
         '''
             Visualize the current game board.
         '''
+        pass
         if len(self.env.grid.shape) > 2:
             raise NotImplementedError()
 
@@ -157,8 +164,8 @@ class HyperCubeMazeTask(environment.Task):
         location = self.env.get_current_state()
 
         marked = False
-        for goal in self.goals:
-            if goal not in self.visited:
+        for goal, idx in self.goals.iteritems():
+            if self.remaining_vec[idx] == 1:
                 if location == goal:
                     world[goal] = 3
                     marked = True
