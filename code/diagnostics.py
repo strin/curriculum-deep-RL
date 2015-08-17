@@ -22,6 +22,7 @@ def visualize_sample_trajectory(agent, task):
         images.append(task.visualize())
         if task.is_terminal():
             break
+        current_state = next_state
 
     # show the position of the agent across time
     def show_image(image):
