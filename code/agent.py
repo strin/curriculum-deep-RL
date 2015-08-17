@@ -265,6 +265,7 @@ class DQN(OnlineAgent):
         self.last_action = None
 
     def get_qvals(self, state):
+        state = state.reshape(1, -1)
         return self.fprop(state)
 
     def get_action(self, state):
