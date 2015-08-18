@@ -185,6 +185,8 @@ class AverageQValueObserver(Observer):
                 rand_action = np.random.randint(num_actions)
                 next_state, reward = experiment.task.perform_action(rand_action)
                 if experiment.task.is_terminal():
+                    if hasattr(experiment.agent, 'end_episode'):  # for recurrent agents.
+                        experiment.agent.end_episode(0, no_learning=True)
                     break
                 self.states.append(next_state)
 
@@ -210,11 +212,11 @@ class SpeedObserver(Observer):
         self.prev_steps = 0
         self.prev_time = time.time()
 
-    def observe(self, maximizer):
-        if maximizer.steps % self.report_wait != 0:
+    def observe(self, experiment):
+        if experiment.num_episodes % self.report_wait != 0:
             return None
         seconds = time.time() - self.prev_time
-        steps = maximizer.steps - self.prev_steps
+        steps = experiment.total_steps - self.prev_steps
         self.prev_time = time.time()
-        self.prev_steps = maximizer.steps
+        self.prev_steps = experiment.total_steps
         return {('speed', 'speed'): steps / seconds}
