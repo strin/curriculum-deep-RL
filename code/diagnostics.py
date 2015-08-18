@@ -37,6 +37,7 @@ def get_sample_trajectory(agent, task):
     '''
     # sample a trajectory
     task.reset()
+    agent.reset()
     current_state = task.get_start_state()
     images = [task.visualize()]
     while True:
@@ -44,10 +45,10 @@ def get_sample_trajectory(agent, task):
         next_state, reward = task.perform_action(action)
         images.append(task.visualize())
         if task.is_terminal():
-            if hasattr(agent, 'end_episode'):  # for recurrent agents.
-                agent.end_episode(0, no_learning=True)
             break
         current_state = next_state
+
+    agent.reset()
     return images
 
 
@@ -60,7 +61,7 @@ class VisualizeTrajectoryController(Controller):
 
     def control(self, experiment):
         if experiment.num_episodes % self.visualize_wait == 0:
-            trajectory = get_sample_trajectory()
+            trajectory = get_sample_trajectory(experiment.task, experiment.agent)
             print 'Saving trajectory...'
             file_name = 'trajectory_' + str(experiment.num_episodes) + '.cpkl'
             pickle.dump(trajectory, file(os.path.join(self.dir_name, file_name), 'wb'),

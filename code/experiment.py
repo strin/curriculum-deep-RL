@@ -198,7 +198,6 @@ class AverageQValueObserver(Observer):
                 qvals = []
                 for state in states:
                     qvals.append(np.max(experiment.agent.get_qvals(state)))
-
                 return np.mean(qvals)
 
             return {('average_q_val', 'average_q_val'): qval_mean(self.states)}

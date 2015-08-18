@@ -15,6 +15,11 @@ class OnlineAgent(object):
     def learn(self, next_state, reward):
         raise NotImplementedError()
 
+    def reset(self):
+        '''
+            Optional method.
+        '''
+
 
 class ValueIterationSolver(OnlineAgent):
 
@@ -554,16 +559,22 @@ class RecurrentReinforceAgent(OnlineAgent):
 
         return baselines, updates
 
-    def end_episode(self, reward, no_learning=False):
+    def reset(self):
+        self.reset_net()
+
+        # erase all of the samples
+        self.trajectories = [Trajectory()]
+        self.curr_traj_idx = 0
+
+    def end_episode(self, reward):
         '''
             Updates the network
         '''
-        if not no_learning:
-            self.trajectories[self.curr_traj_idx].add_sample(self.last_state,
-                                                             self.last_action,
-                                                             reward)
+        self.trajectories[self.curr_traj_idx].add_sample(self.last_state,
+                                                         self.last_action,
+                                                         reward)
 
-        if len(self.trajectories) >= self.num_samples and not no_learning:
+        if len(self.trajectories) >= self.num_samples:
             self._update_net()
 
             # erase all of the samples
