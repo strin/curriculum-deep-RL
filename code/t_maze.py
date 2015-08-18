@@ -169,6 +169,8 @@ class TMazeObserver(Observer):
                     act = experiment.agent.get_action(curr_obs)
                     next_obs, reward = experiment.task.perform_action(act)
                     if experiment.task.is_terminal():
+                        if hasattr(experiment.agent, 'end_episode'):  # for recurrent agents.
+                            experiment.agent.end_episode(0, no_learning=True)
                         return steps, reward
 
                     steps += 1
