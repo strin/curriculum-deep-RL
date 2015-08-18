@@ -554,15 +554,16 @@ class RecurrentReinforceAgent(OnlineAgent):
 
         return baselines, updates
 
-    def end_episode(self, reward):
+    def end_episode(self, reward, no_learning=False):
         '''
             Updates the network
         '''
-        self.trajectories[self.curr_traj_idx].add_sample(self.last_state,
-                                                         self.last_action,
-                                                         reward)
+        if not no_learning:
+            self.trajectories[self.curr_traj_idx].add_sample(self.last_state,
+                                                             self.last_action,
+                                                             reward)
 
-        if len(self.trajectories) >= self.num_samples:
+        if len(self.trajectories) >= self.num_samples and not no_learning:
             self._update_net()
 
             # erase all of the samples
