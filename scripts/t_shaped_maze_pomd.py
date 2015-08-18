@@ -5,6 +5,7 @@
 
 import scriptinit
 import numpy as np
+import argparse
 import util
 from t_maze import *
 from experiment import *
@@ -13,29 +14,38 @@ from agent import RecurrentReinforceAgent
 
 # In[ ]:
 
-# general parameters
-hyperparams = {
-    # task specific
-    'maze_length' : 10,
-    'noisy_observations': False,
-    'gamma': 0.98,
+# step up argument parsing
+parser = argparse.ArgumentParser()
 
-    # model specific
-    'hidden_dimension' : 128,
-    'num_trajectory_samples' : 10,
-    'truncate_gradient' : -1,  # number of steps to run BPTT (-1 means use the whole sequence)
-    'max_trajectory_length' : float('inf'),  # the length of longest (s, a, r) sequence used
-    
-    
-    # experiment specific
-    'max_episodes' : 5000,
-    'report_wait' : 50,
-    'save_wait' : 100,
-    'experiment_samples' : 20
-}
+# task arguments
+parser.add_argument('-ml', '--maze_length', type=int, required=True)
+parser.add_argument('-no', '--noisy_observations', type=int, required=True) 
+parser.add_argument('-g', '--gamma', type=float, required=True)
+
+# model arguments
+parser.add_argument('-hd', '--hidden_dimension', type=int, required=True)
+parser.add_argument('-ns', '--num_trajectory_samples', type=int, required=True)
+parser.add_argument('-tg', '--truncate_gradient', type=int, default=-1)  # number of steps to run BPTT (-1 means use the whole sequence)
+parser.add_argument('-mt', '--max_trajectory_length', type=float, default=float('inf'))  # the length of longest (s, a, r) sequence used
+
+# experiment specific arguments
+parser.add_argument('-me', '--max_episodes', type=int, required=True)
+parser.add_argument('-rw', '--report_wait', type=int, required=True)
+parser.add_argument('-sw', '--save_wait', type=int, required=True)
+parser.add_argument('-ex', '--experiment_samples', type=int, required=True)
 
 
-# load into namespace and log to metadata
+# In[ ]:
+
+# load arguments into namespace and log to metadata
+if util.in_ipython():
+    args = parser.parse_args(['-ml', '3', '-no', '0', '-g', '0.98', '-hd', '128', '-ns', '10', '-me','5000',
+                              '-rw', '100', '-sw', '1000', '-ex', '50', '-mt', 'inf'])
+else:
+    args = parser.parse_args()
+
+hyperparams = vars(args)
+
 for var, val in hyperparams.iteritems():
     exec("{0} = hyperparams['{0}']".format(var))
     util.metadata(var, val)
@@ -65,4 +75,9 @@ experiment = Experiment(rr_agent, task, controllers=controllers, observers=obser
 # In[ ]:
 
 experiment.run_experiments()
+
+
+# In[ ]:
+
+
 
