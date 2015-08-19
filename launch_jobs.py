@@ -3,7 +3,11 @@ import argparse
 import copy
 import configs
 
+print
+print
 print "WARNING: USING EXISTING CODE. UPLOAD A NEW BUNDLE IF THERE ARE CHANGES"
+print
+print
 
 parser = argparse.ArgumentParser()
 
