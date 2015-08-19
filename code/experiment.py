@@ -102,7 +102,7 @@ class Controller(object):
     __metaclass__ = abc.ABCMeta
 
     @abc.abstractmethod
-    def control(self, maximizer):
+    def control(self, experiment):
         return
 
 
@@ -110,7 +110,7 @@ class Observer(object):
     __metaclass__ = abc.ABCMeta
 
     @abc.abstractmethod
-    def observe(self, maximizer):
+    def observe(self, experiment):
         return
 
 
