@@ -61,7 +61,7 @@ class VisualizeTrajectoryController(Controller):
 
     def control(self, experiment):
         if experiment.num_episodes % self.visualize_wait == 0:
-            trajectory = get_sample_trajectory(experiment.task, experiment.agent)
+            trajectory = get_sample_trajectory(experiment.agent, experiment.task)
             print 'Saving trajectory...'
             file_name = 'trajectory_' + str(experiment.num_episodes) + '.cpkl'
             pickle.dump(trajectory, file(os.path.join(self.dir_name, file_name), 'wb'),
