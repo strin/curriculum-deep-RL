@@ -1,8 +1,9 @@
 import os
 import argparse
+import copy
 import configs
 
-print "WARNING: USING EXISTING CODE. Upload a new bundle if there are changes"
+print "WARNING: USING EXISTING CODE. UPLOAD A NEW BUNDLE IF THERE ARE CHANGES"
 
 parser = argparse.ArgumentParser()
 
@@ -17,12 +18,24 @@ args = parser.parse_args()
 
 config = getattr(configs, args.config)
 
-options = ""
+options = [""]
 for var, val in config.iteritems():
-    options += '--' + var + ' ' + str(val) + ' '
+    if isinstance(val, list):
+        new_options = []
+        for v in val:
+            next = copy.deepcopy(options)
+            for idx in xrange(len(options)):
+                next[idx] += '--' + var + ' ' + str(v) + ' '
+
+            new_options += next
+        options = new_options
+    else:
+        for idx in xrange(len(options)):
+            options[idx] += '--' + var + ' ' + str(val) + ' '
 
 
-command = 'clb ex %s \'%s\' %s %s %d %dg ' % (args.task, options, args.name, args.queue,
-                                              args.cpus, args.memory)
-print command
-os.system(command)
+for opt in options:
+    command = 'clb ex %s \'%s\' %s %s %d %dg ' % (args.task, opt, args.name, args.queue,
+                                                  args.cpus, args.memory)
+    print command
+    os.system(command)

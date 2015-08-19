@@ -1,7 +1,42 @@
-# general parameters
+'''
+    USAGE: Each config specifies a set of parameters to be passed in from the
+           command line as follows.
+
+           "'string': val" will become "--string val"
+
+           To specify hyperparameters for multiple experiments simultaneously,
+           specify them in a list [a, b, c].
+
+           In this case,
+
+                "'s1': [a, b], 's2': [b, c]"
+
+           will become four separate experiments consisting of all possible
+           permutations of the hyperparameters.
+
+            "--s1 a --s2 b, --s1 a, --s2 c, --s1 b --s2 b, --s1 b, --s2 c"
+'''
+
+import numpy as np
+
+
+def random_reals_range(low, high, num_samples):
+    '''
+        Helper function to randomly sample from an interval over the reals
+    '''
+    return np.random.rand(low=low, high=high, size=(1, num_samples)).tolist()[0]
+
+
+def random_int_range(low, high, num_samples):
+    '''
+        Helper function to randomly sample from an interval integers
+    '''
+    return np.random.randint(low=low, high=high, size=(1, num_samples)).tolist()[0]
+
+
 t_shaped_maze = {
     # task specific
-    'maze_length': 5,
+    'maze_length': random_int_range(3, 20, 5),
     'noisy_observations': 0,  # 0 for noiseless, non-zero for noise
     'gamma': 0.98,
 
