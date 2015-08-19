@@ -52,3 +52,25 @@ t_shaped_maze = {
     'save_wait': 1000,
     'experiment_samples': 50
 }
+
+hypercube = {
+    # task specific
+    'dimensions': (10, 10, 10),
+    'action_stochasticity': 0.,
+    'wall_penalty': -0.1,
+    'time_penalty': -0.1,
+    'reward': 4,
+    'gamma': 0.9,
+
+    # model specific (DQN)
+    'hidden_dimension': 128,
+    'lr': 0.05,
+    'epsilon': 0.15,
+
+    # experiment specific
+    'max_episodes': 500,
+    'report_wait': 50,
+    'save_wait': 100,
+    'fully_observed': 1,  # 0 if partially observed, non-zero otherwise
+    'task_samples': 25
+}
