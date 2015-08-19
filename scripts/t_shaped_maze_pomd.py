@@ -9,6 +9,7 @@ import argparse
 import util
 from t_maze import *
 from experiment import *
+from diagnostics import VisualizeTrajectoryController
 from agent import RecurrentReinforceAgent
 
 
@@ -32,6 +33,7 @@ parser.add_argument('-mt', '--max_trajectory_length', type=float, default=float(
 parser.add_argument('-me', '--max_episodes', type=int, required=True)
 parser.add_argument('-rw', '--report_wait', type=int, required=True)
 parser.add_argument('-sw', '--save_wait', type=int, required=True)
+parser.add_argument('-vw', '--visualize_wait', type=int)
 parser.add_argument('-ex', '--experiment_samples', type=int, required=True)
 
 
@@ -40,7 +42,7 @@ parser.add_argument('-ex', '--experiment_samples', type=int, required=True)
 # load arguments into namespace and log to metadata
 if util.in_ipython():
     args = parser.parse_args(['-ml', '3', '-no', '0', '-g', '0.98', '-hd', '128', '-ns', '10', '-me','5000',
-                              '-rw', '100', '-sw', '1000', '-ex', '50', '-mt', 'inf'])
+                              '-rw', '100', '-sw', '1000', '-ex', '50', '-mt', 'inf', '-vw', '0'])
 else:
     args = parser.parse_args()
 
@@ -68,6 +70,8 @@ rr_agent = RecurrentReinforceAgent(task, hidden_dim=hidden_dimension,
 
 # prepare the experiment
 controllers = [BasicController(report_wait=report_wait, save_wait=save_wait, max_episodes=max_episodes)]
+if visualize_wait is not None and visualize_wait > 0:
+    controllers.append(VisualizeTrajectoryController(visualize_wait=visualize_wait, dir_name='trajectories'))
 observers = [TMazeObserver(num_samples=experiment_samples, report_wait=report_wait)]
 experiment = Experiment(rr_agent, task, controllers=controllers, observers=observers)
 

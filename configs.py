@@ -50,6 +50,7 @@ t_shaped_maze = {
     'max_episodes': 70000,
     'report_wait': 100,
     'save_wait': 1000,
+    'visualize_wait': 0,   # 0 for no visualization.. positive number for visualization
     'experiment_samples': 50
 }
 
@@ -71,6 +72,7 @@ hypercube = {
     'max_episodes': 500,
     'report_wait': 50,
     'save_wait': 100,
+    'visualize_wait': 0,   # 0 for no visualization.. positive number for visualization
     'fully_observed': 1,  # 0 if partially observed, non-zero otherwise
     'task_samples': 25
 }

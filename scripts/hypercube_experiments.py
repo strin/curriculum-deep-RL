@@ -9,7 +9,8 @@ import argparse
 import util
 from hypercube import *
 from experiment import *
-from agent import RecurrentReinforceAgent, DQN
+from diagnostics import VisualizeTrajectoryController
+from agent import DQN
 
 
 # In[ ]:
@@ -41,6 +42,7 @@ parser.add_argument('-eps', '--epsilon', type=float, required=True)
 parser.add_argument('-me', '--max_episodes', type=int, required=True)
 parser.add_argument('-rw', '--report_wait', type=int, required=True)
 parser.add_argument('-sw', '--save_wait', type=int, required=True)
+parser.add_argument('-vw', '--visualize_wait', type=int)
 parser.add_argument('-fo', '--fully_observed', type=int, required=True) 
 parser.add_argument('-ts', '--task_samples', type=int, required=True)
 
@@ -48,9 +50,9 @@ parser.add_argument('-ts', '--task_samples', type=int, required=True)
 # In[ ]:
 
 if util.in_ipython():
-    args = parser.parse_args(['-d','(5, 5, 5)', '-as', '0.', '-wp', '-0.1', '-tp', '-0.1', '-r', '4', '-g', '0.9',
-                              '-hd', '128', '-lr', '0.05', '-eps', '0.15', '-me', '10', '-rw', '2',
-                              '-sw', '5', '-fo', '1', '-ts', '25'])
+    args = parser.parse_args(['-d','(5, 5)', '-as', '0.', '-wp', '-0.1', '-tp', '-0.1', '-r', '4', '-g', '0.9',
+                              '-hd', '128', '-lr', '0.05', '-eps', '0.15', '-me', '100', '-rw', '2',
+                              '-sw', '5', '-fo', '1', '-ts', '25', '-vw'])
 else:
     args = parser.parse_args()
 
@@ -71,9 +73,9 @@ task = HyperCubeMazeTask(maze, wall_penalty=-0.1, time_penalty=-0.1, reward=4., 
 
 
 # for debugging, let's just use a simple fixed goal (assumes the world is 2D!)
-goal_vec = np.random.randint(0, 2, size=(2 ** len(dimensions), 1))
+goal_vec_1 = np.random.randint(0, 2, size=(2 ** len(dimensions), 1))
 while np.sum(goal_vec) == 0.:
-    goal_vec = np.random.randint(0, 2, size=(2 ** len(dimensions), 1))
+    goal_vec_1 = np.random.randint(0, 2, size=(2 ** len(dimensions), 1))
 
 print 'GOAL VECTOR: ', goal_vec
 
@@ -86,6 +88,10 @@ agent = DQN(task, hidden_dim=hidden_dimension, lr=lr, epsilon=epsilon)
 
 # set up the experiment environment
 controllers = [BasicController(report_wait=report_wait, save_wait=save_wait, max_episodes=max_episodes)]
+
+if len(dimensions) == 2 and visualize_wait is not None and visualize_wait > 0:
+    controllers.append(VisualizeTrajectoryController(visualize_wait=visualize_wait, dir_name='trajectories'))
+
 observers = [HyperCubeObserver(report_wait=report_wait), AverageRewardObserver(report_wait=report_wait), AverageQValueObserver(task_samples=task_samples, report_wait=report_wait)]
 experiment = Experiment(agent, task, controllers=controllers, observers=observers)
 
