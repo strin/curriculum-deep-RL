@@ -185,8 +185,6 @@ class AverageQValueObserver(Observer):
                 rand_action = np.random.randint(num_actions)
                 next_state, reward = experiment.task.perform_action(rand_action)
                 if experiment.task.is_terminal():
-                    if hasattr(experiment.agent, 'end_episode'):  # for recurrent agents.
-                        experiment.agent.end_episode(0, no_learning=True)
                     break
                 self.states.append(next_state)
 
