@@ -69,20 +69,21 @@ class HyperCubeMaze(environment.Environment):
 
 class HyperCubeMazeTask(environment.Task):
 
-    def __init__(self, hypercubemaze, wall_penalty=-0.1, time_penalty=0.,
-                 reward=4., gamma=0.9, fully_observed=False):
+    def __init__(self, hypercubemaze, initial_goal, wall_penalty=-0.1, time_penalty=0.,
+                 reward=4., gamma=0.9, fully_observed=False, maximum_steps=None):
         self.env = hypercubemaze
         self.gamma = gamma
         self.fully_observed = fully_observed
+        self.maximum_steps = maximum_steps
+
+        self.num_steps = 0
 
         # keeps track of goal. Set via SET_GOALS
-        self.goal_vec = None
-        self.goals = []
-        self.remaining_vec = None
+        self.set_goals(initial_goal)
 
         self.wall_penalty = wall_penalty  # reward for hitting a wall
         self.time_penalty = time_penalty  # reward earned on steps without action
-        self.reward = reward  # reward earned for reaching a goal (assume all goals are the same for now)
+        self.reward = reward  # reward earned for reaching a goal (assume all goals are the same)
 
     def set_goals(self, goal_vec):
         goal_vec = goal_vec.reshape(-1, 1)  # always a column vector
@@ -93,8 +94,8 @@ class HyperCubeMazeTask(environment.Task):
 
     def _get_goals(self):
         maximums = [max_dim - 1 for max_dim in self.env.dimensions]
-        possible_goals = list(itertools.product(*zip([0] *
-                              len(self.env.dimensions), maximums)))
+        possible_goals = list(itertools.product(*zip([0] * len(self.env.dimensions),
+                                                maximums)))
         goals = {}
         for idx in xrange(len(self.goal_vec)):
             if self.goal_vec[idx]:
@@ -126,15 +127,20 @@ class HyperCubeMazeTask(environment.Task):
 
     def reset(self):
         self.env.reset()
+        self.num_steps = 0
         self.remaining_vec = np.copy(self.goal_vec)
 
     def perform_action(self, action):
+        self.num_steps += 1
         curr_state = self.env.get_current_state()
         next_state = self.env.perform_action(action)
         reward = self.get_reward(curr_state, action, next_state)
         return (self._get_state_vector(next_state), reward)
 
     def is_terminal(self):
+        if self.maximum_steps is not None and self.num_steps > self.maximum_steps:
+            return True
+
         return np.sum(self.remaining_vec) == 0.
 
     def get_reward(self, state, action, next_state):
