@@ -164,8 +164,8 @@ class AverageRewardObserver(Observer):
 
 
 class AverageQValueObserver(Observer):
-    def __init__(self, task_samples=100, report_wait=30):
-        self.task_samples = task_samples  # number of states to randomly sample
+    def __init__(self, state_samples=100, report_wait=30):
+        self.state_samples = state_samples  # number of states to randomly sample
         self.report_wait = report_wait
         self.states = []
 
@@ -188,7 +188,7 @@ class AverageQValueObserver(Observer):
                     break
                 self.states.append(next_state)
 
-            self.states = util.sample_if_large(self.states, self.task_samples)
+            self.states = util.sample_if_large(self.states, self.state_samples)
 
         if experiment.num_episodes % self.report_wait == 0:
 
