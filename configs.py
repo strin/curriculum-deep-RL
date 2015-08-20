@@ -36,7 +36,7 @@ def random_int_range(low, high, num_samples):
 
 t_shaped_maze = {
     # task specific
-    'maze_length': random_int_range(3, 20, 5),
+    'maze_length': random_int_range(3, 50, 10),
     'noisy_observations': 0,  # 0 for noiseless, non-zero for noise
     'gamma': 0.98,
 
@@ -47,32 +47,37 @@ t_shaped_maze = {
     'max_trajectory_length': float('inf'),  # the length of longest (s, a, r) sequence used
 
     # experiment specific
-    'max_episodes': 70000,
+    'max_episodes': 200000,
     'report_wait': 100,
     'save_wait': 1000,
-    'visualize_wait': 0,   # 0 for no visualization.. positive number for visualization
+    'visualize_wait': 100,   # 0 for no visualization.. positive number for visualization
     'experiment_samples': 50
 }
 
 hypercube = {
     # task specific
-    'dimensions': (10, 10, 10),
+    'dimensions': [(10, 10), (10, 10, 10)],
     'action_stochasticity': 0.,
     'wall_penalty': -0.1,
     'time_penalty': -0.1,
     'reward': 4,
     'gamma': 0.9,
+    'maximum_steps': 10000,  # adjust depending on the dimensions
 
     # model specific (DQN)
     'hidden_dimension': 128,
     'lr': 0.05,
     'epsilon': 0.15,
 
+    # curriculum specific
+    'update_every': 10,  # play around with this!
+
     # experiment specific
-    'max_episodes': 500,
+    'max_episodes': 50000,
     'report_wait': 50,
     'save_wait': 100,
-    'visualize_wait': 0,   # 0 for no visualization.. positive number for visualization
+    'visualize_wait': 100,   # 0 for no visualization.. positive number for visualization
     'fully_observed': 1,  # 0 if partially observed, non-zero otherwise
-    'task_samples': 25
+    'state_samples': 25,
+    'eval_samples': 5  # maximum possible depends on the dimension
 }
