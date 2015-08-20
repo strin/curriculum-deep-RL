@@ -4,6 +4,7 @@ import itertools
 import matplotlib
 import random
 import util
+from experiment import Observer, Controller
 
 
 class HyperCubeMaze(environment.Environment):
@@ -234,3 +235,25 @@ class HyperCubeObserver(Observer):
             return metrics
 
         return None
+
+
+class HyperCubeCurriculum(Controller):
+    '''
+        Two types of curriculum for now. The uniform and the bernoulli one.
+    '''
+    def __init__(self, goals, update_every=1, curr_type='uniform'):
+        self.goals = goals
+        self.update_every = update_every
+        self.curr_type = curr_type
+
+    def control(self, experiment):
+        if experiment.num_episodes % self.update_every == 0:
+            experiment.task.reset()
+
+            goal = None
+            if self.curr_type == 'uniform':
+                goal = self.goals[random.randint(0, len(self.goals)-1)]
+            else:
+                raise NotImplementedError()
+
+            experiment.task.set_goals(goal)
