@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[ ]:
+# In[111]:
 
 import scriptinit
 import numpy as np
@@ -13,7 +13,7 @@ from diagnostics import VisualizeTrajectoryController
 from agent import DQN
 
 
-# In[ ]:
+# In[112]:
 
 # step up argument parsing
 parser = argparse.ArgumentParser()
@@ -29,7 +29,7 @@ def tup(s):
 parser.add_argument('-d', '--dimensions', type=tup, required=True)  # expects a (x, y, z, ...) tuple
 parser.add_argument('-as', '--action_stochasticity', type=float, required=True)
 parser.add_argument('-wp', '--wall_penalty', type=float, required=True)
-parser.add_argument('-tp', '-time_penalty', type=float, required=True)
+parser.add_argument('-tp', '--time_penalty', type=float, required=True)
 parser.add_argument('-r', '--reward', type=float, required=True)
 parser.add_argument('-g', '--gamma', type=float, required=True)
 
@@ -47,12 +47,12 @@ parser.add_argument('-fo', '--fully_observed', type=int, required=True)
 parser.add_argument('-ts', '--task_samples', type=int, required=True)
 
 
-# In[ ]:
+# In[113]:
 
 if util.in_ipython():
     args = parser.parse_args(['-d','(5, 5)', '-as', '0.', '-wp', '-0.1', '-tp', '-0.1', '-r', '4', '-g', '0.9',
                               '-hd', '128', '-lr', '0.05', '-eps', '0.15', '-me', '100', '-rw', '2',
-                              '-sw', '5', '-fo', '1', '-ts', '25', '-vw'])
+                              '-sw', '5', '-fo', '1', '-ts', '25'])
 else:
     args = parser.parse_args()
 
@@ -64,23 +64,29 @@ for var, val in hyperparams.iteritems():
     util.metadata(var, val)
 
 
-# In[ ]:
+# In[114]:
 
 # set up the task
 world = np.zeros(dimensions)
-maze = HyperCubeMaze(dimensions=dimensions, action_stoch=0., grid=world)
-task = HyperCubeMazeTask(maze, wall_penalty=-0.1, time_penalty=-0.1, reward=4., gamma=0.9, fully_observed=True)
+maze = HyperCubeMaze(dimensions=dimensions, action_stoch=action_stochasticity, grid=world)
 
-
+# get training/test splits
 # for debugging, let's just use a simple fixed goal (assumes the world is 2D!)
-goal_vec_1 = np.random.randint(0, 2, size=(2 ** len(dimensions), 1))
-while np.sum(goal_vec) == 0.:
-    goal_vec_1 = np.random.randint(0, 2, size=(2 ** len(dimensions), 1))
+goal = np.random.randint(0, 2, size=(2 ** len(dimensions), 1))
+while np.sum(goal) == 0.:
+    goal = np.random.randint(0, 2, size=(2 ** len(dimensions), 1))
 
-print 'GOAL VECTOR: ', goal_vec
+print 'GOAL VECTOR: ', goal
 
-task.set_goals(goal_vec)
 
+task = HyperCubeMazeTask(hypercubemaze=maze, initial_goal=goal,
+                         wall_penalty=wall_penalty, time_penalty=time_penalty,
+                         reward=reward, gamma=gamma, fully_observed=fully_observed)
+
+
+# In[ ]:
+
+# compile the agent
 agent = DQN(task, hidden_dim=hidden_dimension, lr=lr, epsilon=epsilon)
 
 
@@ -102,7 +108,18 @@ experiment = Experiment(agent, task, controllers=controllers, observers=observer
 experiment.run_experiments()
 
 
+# In[66]:
+
+# report results for each goal in the training set
+
+
 # In[ ]:
+
+# report results for each goal in the test set
+
+
+
+# In[68]:
 
 
 
