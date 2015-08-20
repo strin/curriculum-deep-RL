@@ -2,7 +2,8 @@ import environment
 import numpy as np
 import itertools
 import matplotlib
-from experiment import Observer
+import random
+import util
 
 
 class HyperCubeMaze(environment.Environment):
@@ -195,17 +196,41 @@ class HyperCubeObserver(Observer):
         Assumes the task is the hypercube task and report average number
         of steps to completion.
     '''
-    def __init__(self, report_wait=10):
-        self.report_wait = report_wait  # number of episodes to average steps
-        self.step_history = []  # steps to completion of the task
+    def __init__(self, goal_dsets, eval_samples, report_wait=10):
+        self.report_wait = report_wait
+        self.dsets = goal_dsets
+        self.eval_samples = eval_samples
+
+    def trial(self, agent, task, goal):
+        task.reset()
+        task.set_goals(goal)
+        agent.reset()
+        curr_obs = task.get_start_state()
+        steps = 1
+        while True:
+            act = agent.get_action(curr_obs)
+            next_obs, reward = task.perform_action(act)
+            if task.is_terminal():
+                return steps, reward
+            steps += 1
+            curr_obs = next_obs
+
+    def avg_steps(self, experiment, dset):
+        sample = util.sample_if_large(dset, self.eval_samples)
+        steps = [self.get_steps(experiment, goal) for goal in sample]
+        return np.mean(steps)
+
+    def get_steps(self, experiment, goal):
+        episode_steps, reward = self.trial(experiment.agent, experiment.task, goal)
+        return episode_steps
 
     def observe(self, experiment):
-        self.step_history.append(experiment.episode_steps)
-
         if experiment.num_episodes % self.report_wait == 0:
-            avg_steps = np.mean(self.step_history)
-            self.step_history = []
 
-            return {('avg_steps_to_completion', 'avg_steps_to_completion'): avg_steps}
+            metrics = {}
+            for name, dset in self.dsets.iteritems():
+                metrics[('avg_steps', name)] = self.avg_steps(experiment, dset)
+
+            return metrics
 
         return None
