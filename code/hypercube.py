@@ -222,8 +222,11 @@ class HyperCubeObserver(Observer):
         return np.mean(steps)
 
     def get_steps(self, experiment, goal):
-        episode_steps, reward = self.trial(experiment.agent, experiment.task, goal)
-        return episode_steps
+        episode_steps = []
+        for _ in xrange(10):
+            steps, reward = self.trial(experiment.agent, experiment.task, goal)
+            episode_steps.append(steps)
+        return np.mean(episode_steps)
 
     def observe(self, experiment):
         if experiment.num_episodes % self.report_wait == 0:
