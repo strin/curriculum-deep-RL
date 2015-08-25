@@ -10,8 +10,8 @@ function upload {
 
 function ex {
     cl run "export PYTHONPATH=%:Theano%:$PYTHONPATH; \
-    				export THEANO_FLAGS=blas.ldflags=-lopenblas; \
-    				python %:rl%/$1 $2" \
+    		export THEANO_FLAGS=blas.ldflags=-lopenblas; \
+    		python %:rl%/$1 $2" \
     -n $3 \
     --request_priority 1023 \
     --request_queue $4 \
