@@ -5,6 +5,7 @@ import theano.tensor as T
 import layers
 import optimizers
 import cPickle as pickle
+from util import unit_vec
 
 
 class OnlineAgent(object):
@@ -390,7 +391,6 @@ class Trajectory(object):
         return len(self.states)
 
 
-#@util.memoize
 class RecurrentReinforceAgent(OnlineAgent):
     ''' Policy Gradient with a LSTM function approximator '''
     def __init__(self, task, hidden_dim=1024, truncate_gradient=-1, num_samples=5,
@@ -668,3 +668,223 @@ class RecurrentReinforceAgent(OnlineAgent):
             layer.set_params(params[name])
 
         self.reset_net()
+
+
+class DecompositionAgent(OnlineAgent):
+    '''
+            THIS NETWORK IS A HACK FOR THE APPLES TASK ON THE SQUARE!
+    '''
+
+    def __init__(self, task, hidden_dim=128, l2_reg=0.0, lr=1e-1, epsilon=0.05,
+                 memory_size=250, minibatch_size=64):
+        self.task = task
+        self.state_dim = task.get_state_dimension()
+        self.num_actions = task.get_num_actions()
+
+        self.gamma = task.gamma
+        self.hidden_dim = hidden_dim
+        self.l2_reg = l2_reg
+        self.lr = lr
+        self.epsilon = epsilon
+        self.memory_size = memory_size  # number of experiences to store
+        self.minibatch_size = minibatch_size
+
+        self.model = self._initialize_net()
+
+        # for now, keep experience as a list of tuples
+        self.experience = []
+        self.exp_idx = 0
+
+        # used for streaming updates
+        self.last_state = None
+        self.last_action = None
+
+    def get_decomposed_state(self, state):
+        '''
+            HACK! THIS HARDCODES A SINGLE TASK INTO THE NETWORK!
+        '''
+        s = state[:2]
+        g = state[2:6]
+        r = state[6:]
+
+        s_g = [np.concatenate([s, g * unit_vec(4, idx), r * unit_vec(4, idx)]) for idx in xrange(4)]
+
+        return np.concatenate(s_g)
+
+    def _initialize_net(self):
+        '''
+            THIS NETWORK IS A HACK FOR THE APPLES TASK ON THE SQUARE!
+
+            Assumes all (s, g_i) pairs are the same length and that the
+            input state vector is [(s, g_1), (s, g_2), (s, g_3), (s, g_4)]
+        '''
+        # initialize layers
+        fc1 = layers.FullyConnected(input_dim=self.state_dim,
+                                    output_dim=self.hidden_dim,
+                                    activation='relu')
+
+        # HACK! (Concatenation)
+        fc2 = layers.FullyConnected(input_dim=4*self.hidden_dim,
+                                    output_dim=self.hidden_dim,
+                                    activation='relu')
+
+        linear_layer = layers.FullyConnected(input_dim=self.hidden_dim,
+                                             output_dim=self.num_actions,
+                                             activation=None)
+
+        model = {'fc1': fc1, 'fc2': fc2, 'linear': linear_layer}
+
+        # construct computation graph for forward pass
+        states = T.matrix('states')
+
+        # HACK!
+        ####
+        splits = [self.state_dim] * 4
+        v1, v2, v3, v4 = T.split(states, splits, n_splits=4, axis=1)
+        h1, h2, h3, h4 = fc1(v1), fc1(v2), fc1(v3), fc1(v4)
+
+        # if you change to sum, fix fc2 dimensions
+        hidden_1 = T.concatenate([h1, h2, h3, h4], axis=1)
+
+        ######
+
+        hidden_2 = fc2(hidden_1)
+        action_values = linear_layer(hidden_2)
+
+        print "Compiling DECOMPOSITION FPROP"
+        self.fprop = theano.function(inputs=[states], outputs=action_values,
+                                     name='fprop')
+
+        # build computation graph for backward pass (using the variables
+        # introduced previously for forward)
+        targets = T.vector('target')
+        last_actions = T.lvector('action')
+        mse = layers.MSE(action_values[T.arange(action_values.shape[0]),
+                         last_actions], targets)
+
+        # regularization
+        params = fc1.params + fc2.params + linear_layer.params
+        l2_penalty = 0.
+        for param in params:
+            l2_penalty += (param ** 2).sum()
+
+        cost = mse + self.l2_reg * l2_penalty
+
+        updates = optimizers.Adam(cost, params)
+
+        # takes a single gradient step
+        print "Compiling DECOMPOSITION bprop"
+        td_errors = T.sqrt(mse)
+        self.bprop = theano.function(inputs=[states, last_actions, targets],
+                                     outputs=td_errors, updates=updates)
+
+        print 'done'
+        return model
+
+    def end_episode(self, reward):
+        if self.last_state is not None:
+            self._add_to_experience(self.last_state, self.last_action, None,
+                                    reward)
+        self.last_state = None
+        self.last_action = None
+
+    def get_qvals(self, state):
+        state = self.get_decomposed_state(state)
+
+        state = state.reshape(1, -1)
+        return self.fprop(state)
+
+    def get_action(self, state):
+        state = self.get_decomposed_state(state)
+
+        # transpose since the DQN expects row vectors
+        state = state.reshape(1, -1)
+
+        # epsilon greedy w.r.t the current policy
+        if(random.random() < self.epsilon):
+            action = np.random.randint(0, self.num_actions)
+        else:
+            # a^* = argmax_{a} Q(s, a)
+            action = np.argmax(self.fprop(state))
+
+        self.last_state = state
+        self.last_action = action
+
+        return action
+
+    def _add_to_experience(self, s, a, ns, r):
+        # TODO: improve experience replay mechanism by making it harder to
+        # evict experiences with high td_error, for example
+        if len(self.experience) < self.memory_size:
+            self.experience.append((s, a, ns, r))
+        else:
+            self.experience[self.exp_idx] = (s, a, ns, r)
+            self.exp_idx += 1
+            if self.exp_idx >= self.memory_size:
+                self.exp_idx = 0
+
+    def _update_net(self):
+        '''
+            sample from the memory dataset and perform gradient descent on
+            (target - Q(s, a))^2
+        '''
+
+        # don't update the network until sufficient experience has been
+        # accumulated
+        if len(self.experience) < self.memory_size:
+            return
+
+        #HACK
+        ##
+        states = np.zeros((self.minibatch_size, 4*self.state_dim,))
+        next_states = np.zeros((self.minibatch_size, 4*self.state_dim))
+        ##
+        actions = np.zeros(self.minibatch_size, dtype=int)
+        rewards = np.zeros(self.minibatch_size)
+
+        # sample and process minibatch
+        samples = random.sample(self.experience, self.minibatch_size)
+        terminals = []
+        for idx, sample in enumerate(samples):
+            state, action, next_state, reward = sample
+            states[idx, :] = state.ravel()
+            actions[idx] = action
+            rewards[idx] = reward
+
+            if next_state is not None:
+                next_states[idx, :] = next_state.ravel()
+            else:
+                terminals.append(idx)
+
+        # compute target reward + \gamma max_{a'} Q(ns, a')
+        next_qvals = np.max(self.fprop(next_states), axis=1)
+
+        # Ensure target = reward when NEXT_STATE is terminal
+        next_qvals[terminals] = 0.
+
+        targets = rewards + self.gamma * next_qvals
+
+        self.bprop(states, actions, targets.flatten())
+
+    def learn(self, next_state, reward):
+        next_state = self.get_decomposed_state(next_state)
+
+        self._add_to_experience(self.last_state, self.last_action,
+                                next_state, reward)
+        self._update_net()
+
+    def save_params(self, path):
+        assert path is not None
+        print 'Saving params to ', path
+        params = {}
+        for name, layer in self.model.iteritems():
+            params[name] = layer.get_params()
+        pickle.dump(params, file(path, 'wb'), protocol=pickle.HIGHEST_PROTOCOL)
+
+    def load_params(self, path):
+        assert path is not None
+        print 'Restoring params from ', path
+        params = pickle.load(file(path, 'r'))
+        for name, layer in self.model.iteritems():
+            layer.set_params(params[name])
+
