@@ -93,7 +93,7 @@ random.seed(SEED)
 random.shuffle(goals)
 
 # get goal training/test splits
-split = int(0.8 * len(goals))
+split = int(0.75 * len(goals))
 train, test = goals[:split], goals[split:]
 
 
@@ -139,6 +139,11 @@ experiment = Experiment(agent, task, controllers=controllers, observers=observer
 
 # launch experiment
 experiment.run_experiments()
+
+
+# In[ ]:
+
+
 
 
 # In[ ]:
