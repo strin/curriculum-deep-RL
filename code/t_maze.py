@@ -154,38 +154,56 @@ class TMazeObserver(Observer):
         Assumes the task is the t-shaped maze task and reports percent
         success and average numver of steps on NUM_SAMPLES trials.
     '''
-    def __init__(self, num_samples=10, report_wait=10):
+    def __init__(self, num_samples=10, report_wait=10, test_task=None):
         self.report_wait = report_wait  # number of episodes to average reward over
         self.num_samples = num_samples
+        self.test_task = test_task
 
-    def observe(self, experiment):
-        if experiment.num_episodes % self.report_wait == 0:
+    def trial(self, agent, task):
+        task.reset()
+        agent.reset()
+        curr_obs = task.get_start_state()
+        steps = 1
+        while True:
+            act = agent.get_action(curr_obs)
+            next_obs, reward = task.perform_action(act)
+            if task.is_terminal():
+                return steps, reward
 
-            def trial():
-                experiment.task.reset()
-                experiment.agent.reset()
-                curr_obs = experiment.task.get_start_state()
-                steps = 1
-                while True:
-                    act = experiment.agent.get_action(curr_obs)
-                    next_obs, reward = experiment.task.perform_action(act)
-                    if experiment.task.is_terminal():
-                        return steps, reward
+            steps += 1
+            curr_obs = next_obs
 
-                    steps += 1
-                    curr_obs = next_obs
-
+    def get_statistics(self, agent, task):
             step_history = []
             success_history = []
+
             for _ in xrange(self.num_samples):
-                steps, final_reward = trial()
+
+                steps, final_reward = self.trial(agent, task)
                 step_history.append(steps)
                 success_history.append(final_reward > 0)
 
             percent_success = np.mean(success_history)
             avg_steps = np.mean(step_history)
 
-            return {('percent_success', 'percent_success'): percent_success,
-                    ('avg_steps', 'avg_steps'): avg_steps}
+            return percent_success, avg_steps
+
+    def observe(self, experiment):
+        if experiment.num_episodes % self.report_wait == 0:
+
+            agent = experiment.agent
+            tasks = {'train': experiment.task}
+
+            if self.test_task is not None:
+                tasks['test'] = self.test_task
+
+            metrics = {}
+            for name, task in tasks.iteritems():
+                percent_success, avg_steps = self.get_statistics(agent, task)
+
+                metrics[('percent_success', name)] = percent_success
+                metrics[('avg_steps', name)] = avg_steps
+
+            return metrics
 
         return None
