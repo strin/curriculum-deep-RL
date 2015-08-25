@@ -11,7 +11,7 @@ import util
 from hypercube import *
 from experiment import *
 from diagnostics import VisualizeTrajectoryController
-from agent import DQN
+from agent import DQN, DecompositionAgent
 
 
 # In[ ]:
@@ -26,15 +26,15 @@ SEED=999
 # step up argument parsing
 parser = argparse.ArgumentParser()
 
-def tup(s):
-    try:
-        s = s[1:-1]  # strip off the ( ) 
-        return tuple(map(int, s.split(',')))
-    except:
-        raise argparse.ArgumentTypeError("Must give a tuple!")
+# def tup(s):
+#     try:
+#         s = s[1:-1]  # strip off the ( ) 
+#         return tuple(map(int, s.split(',')))
+#     except:
+#         raise argparse.ArgumentTypeError("Must give a tuple!")
 
 # task arguments
-parser.add_argument('-d', '--dimensions', type=tup, required=True)  # expects a (x, y, z, ...) tuple
+parser.add_argument('-d', '--dimensions', nargs='+', type=int, required=True)
 parser.add_argument('-as', '--action_stochasticity', type=float, required=True)
 parser.add_argument('-wp', '--wall_penalty', type=float, required=True)
 parser.add_argument('-tp', '--time_penalty', type=float, required=True)
@@ -47,6 +47,7 @@ parser.add_argument('-ms', '--maximum_steps', type=int)
 parser.add_argument('-hd', '--hidden_dimension', type=int, required=True)
 parser.add_argument('-lr', '--lr', type=float, required=True)
 parser.add_argument('-eps', '--epsilon', type=float, required=True)
+parser.add_argument('-decomp', '--decomposition', type=int, required=True)
 
 # curriculum argument
 parser.add_argument('-up', '--update_every', type=float, required=True)
@@ -65,9 +66,10 @@ parser.add_argument('-es', '--eval_samples', type=int, required=True)
 # In[ ]:
 
 if util.in_ipython():
-    args = parser.parse_args(['-d','(5, 5)', '-as', '0.', '-wp', '-0.1', '-tp', '-0.1', '-r', '4', '-g', '0.9',
+    args = parser.parse_args(['-d','5', '5', '-as', '0.', '-wp', '-0.1', '-tp', '-0.1', '-r', '4', '-g', '0.9',
                               '-hd', '128', '-lr', '0.05', '-eps', '0.15', '-me', '1000', '-rw', '2',
-                              '-sw', '5', '-fo', '1', '-ss', '25', '-es', '5', '-ms', '500', '-up', '1'])
+                              '-sw', '5', '-fo', '1', '-ss', '25', '-es', '5', '-ms', '500', '-up', '1',
+                            '-decomp', '1'])
 else:
     args = parser.parse_args()
 
@@ -112,7 +114,12 @@ task = HyperCubeMazeTask(hypercubemaze=maze, initial_goal=train[0],
 # In[ ]:
 
 # compile the agent
-agent = DQN(task, hidden_dim=hidden_dimension, lr=lr, epsilon=epsilon)
+if decomposition:
+    model = DecompositionAgent
+else:
+    model = DQN
+    
+agent = model(task, hidden_dim=hidden_dimension, lr=lr, epsilon=epsilon)
 
 
 # In[ ]:
@@ -139,6 +146,11 @@ experiment = Experiment(agent, task, controllers=controllers, observers=observer
 
 # launch experiment
 experiment.run_experiments()
+
+
+# In[ ]:
+
+
 
 
 # In[ ]:
