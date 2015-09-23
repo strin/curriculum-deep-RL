@@ -40,15 +40,15 @@ def get_sample_trajectory(agent, task):
     agent.reset()
     current_state = task.get_start_state()
     images = [task.visualize()]
-    while True:
-        action = agent.get_action(current_state)
-        next_state, reward = task.perform_action(action)
-        images.append(task.visualize())
-        if task.is_terminal():
-            break
-        current_state = next_state
+    # while True:
+    #     action = agent.get_action(current_state)
+    #     next_state, reward = task.perform_action(action)
+    #     images.append(task.visualize())
+    #     if task.is_terminal():
+    #         break
+    #     current_state = next_state
 
-    agent.reset()
+    # agent.reset()
     return images
 
 

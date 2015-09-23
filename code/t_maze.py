@@ -191,15 +191,13 @@ class TMazeObserver(Observer):
     def observe(self, experiment):
         if experiment.num_episodes % self.report_wait == 0:
 
-            agent = experiment.agent
             tasks = {'train': experiment.task}
-
             if self.test_task is not None:
                 tasks['test'] = self.test_task
 
             metrics = {}
             for name, task in tasks.iteritems():
-                percent_success, avg_steps = self.get_statistics(agent, task)
+                percent_success, avg_steps = self.get_statistics(experiment.agent, task)
 
                 metrics[('percent_success', name)] = percent_success
                 metrics[('avg_steps', name)] = avg_steps

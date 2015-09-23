@@ -184,7 +184,7 @@ class DQN(OnlineAgent):
     '''
 
     def __init__(self, task, hidden_dim=128, l2_reg=0.0, lr=1e-1, epsilon=0.05,
-                 memory_size=250, minibatch_size=32):
+                 memory_size=250, minibatch_size=64):
         self.task = task
         self.state_dim = task.get_state_dimension()
         self.num_actions = task.get_num_actions()
@@ -743,11 +743,22 @@ class DecompositionAgent(OnlineAgent):
         v1, v2, v3, v4 = T.split(states, splits, n_splits=4, axis=1)
         h1, h2, h3, h4 = fc1(v1), fc1(v2), fc1(v3), fc1(v4)
 
-        # if you change to sum, fix fc2 dimensions
+        # CONCAT
+        # fix fc2 input dimensions
         hidden_1 = T.concatenate([h1, h2, h3, h4], axis=1)
 
-        ######
+        # SUM
+        # hidden_1 = h1 + h2 + h3 + h4
 
+        # h11, h22, h33, h44 = fc2(h1), fc2(h2), fc2(h3), fc2(h4)
+
+        # H2 CONCATE. Fix linear_layer
+        # hidden_2 = T.concatenate([h11, h22, h33, h44], axis=1)
+
+        # SUM
+        # hidden_2 = h11 + h22 + h33 + h44
+
+        ######
         hidden_2 = fc2(hidden_1)
         action_values = linear_layer(hidden_2)
 
