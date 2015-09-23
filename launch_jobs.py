@@ -3,12 +3,6 @@ import argparse
 import copy
 import configs
 
-print
-print
-print "WARNING: USING EXISTING CODE. UPLOAD A NEW BUNDLE IF THERE ARE CHANGES"
-print
-print
-
 parser = argparse.ArgumentParser()
 
 # task arguments
@@ -37,7 +31,14 @@ for var, val in config.iteritems():
         for idx in xrange(len(options)):
             options[idx] += '--' + var + ' ' + str(val) + ' '
 
+# print
+# print
+# print "WARNING: USING EXISTING CODE. UPLOAD A NEW BUNDLE IF THERE ARE CHANGES"
+# print
+# print
 
+# for now just upload a new bundle...
+os.system('clb upload')
 for opt in options:
     command = 'clb ex %s \'%s\' %s %s %d %dg ' % (args.task, opt, args.name, args.queue,
                                                   args.cpus, args.memory)
