@@ -7,4 +7,11 @@
 
 *.cpkl
 
+# OSX.
+.DS_Store
+
+# vim.
+*.swp
+
+# other.
 venv/*
