@@ -146,7 +146,7 @@ class GridWorld(environment.Task):
         '''
     def __init__(self, grid, rewards, wall_penalty, gamma, tabular=True):
         ''' Assumes grid has already been initialized. Rewards is a map of
-            (x, y)-coordinates and the reward for reaching that point'''
+            (y, x)-coordinates and the reward for reaching that point'''
         self.wall_penalty = wall_penalty
         self.rewards = rewards
         self.env = grid
@@ -181,6 +181,71 @@ class GridWorld(environment.Task):
         return (next_state, reward)
 
     def reset(self):
+        while(self.env.state_pos[self.env.get_current_state()] in self.rewards):
+            self.env.reset()
+
+    def get_allowed_actions(self, state):
+        if (self.env.state_pos[state] in self.rewards):
+            return []
+        else:
+            return self.env.get_allowed_actions(state)
+
+    def get_reward(self, state, action, next_state):
+        # returns the reward based on the (s, a, s') triple
+        if (state == next_state):
+            return self.wall_penalty
+
+        if (self.env.state_pos[next_state] in self.rewards):
+            return self.rewards[self.env.state_pos[next_state]]
+
+        return 0.  # no reward
+
+
+class GridWorldWithGoals(environment.Task):
+    '''A variant of the GridWorld task.
+
+    each state consists of the state in the GridWorld task as well as a goal
+    vector.
+        '''
+    def __init__(self, grid, goal, rewards, wall_penalty, gamma):
+        ''' Assumes grid has already been initialized. Rewards is a map of
+            (y, x)-coordinates and the reward for reaching that point
+
+            goal is a 1-dimensional numpy vector.
+        '''
+        self.wall_penalty = wall_penalty
+        self.env = grid
+        self.gamma = gamma
+        self.reset(goal=goal,
+                   rewards=rewards)
+
+    def get_state_dimension(self):
+        return self.env.grid.reshape(-1).shape[0] + self.goal.reshape(-1).shape[0]
+
+    def wrap_state_with_goal(self, state_resized):
+        goal_resized = self.goal.ravel().reshape(-1, 1)
+        return np.concatenate((state_resized, goal_resized), axis=0)
+
+    def get_current_state(self):
+        agent_state = np.zeros_like(self.env.grid)
+        agent_state[self.env.state_pos[self.env.get_current_state()]] = 1.0
+        state_resized = agent_state.ravel().reshape(-1, 1)
+        return self.wrap_state_with_goal(state_resized)
+
+    def perform_action(self, action):
+        curr_state = self.env.get_current_state()
+        next_state = self.env.perform_action(action)
+        reward = self.get_reward(curr_state, action, next_state)
+
+        agent_state = np.zeros_like(self.env.grid)
+        agent_state[self.env.state_pos[next_state]] = 1.0
+        next_state = agent_state.ravel().reshape(-1, 1)
+        next_state_with_goal = self.wrap_state_with_goal(next_state)
+        return (next_state_with_goal, reward)
+
+    def reset(self, goal, rewards):
+        self.goal = goal
+        self.rewards = rewards
         while(self.env.state_pos[self.env.get_current_state()] in self.rewards):
             self.env.reset()
 

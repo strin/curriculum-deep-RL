@@ -12,6 +12,7 @@
 
 # vim.
 *.swp
+*.ropeproject
 
 # other.
 venv/*
