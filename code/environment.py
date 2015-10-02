@@ -35,6 +35,19 @@ class Environment(object):
         ''' Optional method for episodic tasks '''
         pass
 
+    def support_tabular(self):
+        ''' tabular support is usually off when the representation high-dimensional '''
+        return True
+
+def EnvironmentWithGoal(Environment):
+
+    def get_num_goals(self):
+        # return the number of goals.
+        raise NotImplementedError()
+
+    def get_current_goal(self):
+        # return the current goal.
+        return NotImplementedError()
 
 class MDP(object):
 

@@ -1,6 +1,7 @@
 import random
 import environment
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 class Grid(environment.Environment):
@@ -43,6 +44,10 @@ class Grid(environment.Environment):
                     self.state_pos[state_num] = (i, j)
                     state_num += 1
         return pos
+
+    @property
+    def shape(self):
+        return self.grid.shape
 
     def get_num_states(self):
         return self.num_states
@@ -101,6 +106,10 @@ class Grid(environment.Environment):
                 next[ns] = self.action_stoch / float(len(self.actions))
 
         return next.items()
+
+    def visualize(self):
+        plt.imshow(self.grid)
+        plt.axis('off')
 
 
 class GridWorldMDP(environment.MDP):
