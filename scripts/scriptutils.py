@@ -1,4 +1,5 @@
 import numpy as np
+import numpy.random as npr
 import dill
 import os
 
@@ -30,6 +31,9 @@ def solve_world_by_value_iteration(world, rewards, wall_penalty=0., gamma=0.9, a
 
     # solve the grid.
     return solve_grid_by_value_iteration(grid, rewards, wall_penalty, gamma)
+
+def solve_task_by_value_iteration(task):
+    return solve_grid_by_value_iteration(task.env, task.rewards, task.wall_penalty, task.gamma)
 
 def maze_template(maze):
     global world
@@ -69,4 +73,10 @@ def load(key):
         return dill.load(open('cache/' + key, 'r'))
     except IOError as e:
         return None
+
+def train_test_split(dataset, training_ratio = 0.6):
+    indices = npr.choice(range(len(dataset)), int(len(dataset) * 0.6), replace=True)
+    train_set = [dataset[ind] for ind in indices]
+    test_set = [dataset[ind] for ind in range(len(dataset)) if ind not in indices]
+    return (train_set, test_set)
 

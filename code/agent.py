@@ -1,12 +1,12 @@
 import random
 import numpy as np
+import numpy.random as npr
 import theano
 import theano.tensor as T
 import layers
 import optimizers
 import cPickle as pickle
 from util import unit_vec
-
 
 class OnlineAgent(object):
 
@@ -20,7 +20,6 @@ class OnlineAgent(object):
         '''
             Optional method.
         '''
-
 
 class ValueIterationSolver(OnlineAgent):
 
@@ -898,4 +897,87 @@ class DecompositionAgent(OnlineAgent):
         params = pickle.load(file(path, 'r'))
         for name, layer in self.model.iteritems():
             layer.set_params(params[name])
+
+
+class OracleAgent(OnlineAgent):
+    '''
+    an oracle agent knows the value of each state, and acts based on the values (i.e. off-policy).
+
+    notice, however these values might not necessarily be the ground truth values,
+    instead, it could any value function approximated by a model like neural networks.
+    '''
+    def __init__(self, value_func, task,
+        strategy={
+            'name': 'softmax',
+            'temperature': 1.},
+        tol=1e-3):
+        '''
+        values (dict): a mapping from state to values
+        '''
+        self.value_func = value_func
+        self.task = task
+        self.strategy = strategy
+        self.num_states = task.get_num_states()
+        self.tol = tol
+        self.V = [1. for s in xrange(self.num_states)]
+
+    def get_actions_with_probs(self, state):
+        available_actions = self.task.get_allowed_actions(state)
+        available_values = []
+        probs = []
+        if available_actions:
+            for action in available_actions:
+                val = 0.
+                ns_dist = self.task.next_state_distribution(state, action)
+                for ns, prob in ns_dist:
+                    val += prob * (self.task.get_reward(state, action, ns) +
+                            self.task.gamma * float(self.value_func(ns)))
+                available_values.append(val)
+            if self.strategy['name'] == 'softmax':
+                probs = np.array(available_values)
+                probs = np.exp(probs / self.strategy['temperature'])
+            elif self.strategy['name'] == 'eps-greedy':
+                if npr.rand() < self.strategy['eps']:
+                    probs = np.array([1.0] * len(available_actions))
+                else:
+                    action_i = np.argmax(available_values)
+                    probs = np.zeros(len(available_actions))
+                    probs[action_i] = 1.
+            probs /= sum(probs)
+        return (available_actions, probs)
+
+    def get_action(self, state):
+        (available_actions, probs) = self.get_actions_with_probs(state)
+        action = npr.choice(available_actions, 1, replace=True, p = probs)[0]
+        return action
+
+    def learn(self, max_iter = 1000):
+        ''' Performs value iteration on the MDP until convergence '''
+        for it in range(max_iter):
+            max_diff = 0.
+
+            for state in xrange(self.num_states):
+                (available_actions, probs) = self.get_actions_with_probs(state)
+                if not available_actions:
+                    total_val = 0.
+                else:
+                    total_val = 0.
+                    for idx, action in enumerate(available_actions):
+                        val = 0.
+                        ns_dist = self.task.next_state_distribution(state, action)
+                        for ns, prob in ns_dist:
+                            val += prob * (self.task.get_reward(state, action, ns) +
+                                           self.task.gamma * self.V[ns])
+                        total_val += probs[idx] * val
+
+                diff = abs(self.V[state] - total_val)
+                self.V[state] = total_val
+
+                if diff > max_diff:
+                    max_diff = diff
+
+            if max_diff < self.tol:
+                return
+        print 'warning: value iteration not terminated'
+
 

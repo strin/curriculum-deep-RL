@@ -14,5 +14,14 @@
 *.swp
 *.ropeproject
 
+# ctags
+tags
+
+# cache & trash
+scripts/cache
+scripts/maze/cache
+scripts
+
 # other.
 venv/*
+

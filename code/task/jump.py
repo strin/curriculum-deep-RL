@@ -115,24 +115,25 @@ class JumpGame(environment.Environment):
             # add new objects.
             self._gen_scene()
 
+        # perform action.
+        [y, x] = self.sprite
+        is_in_air = lambda: y < H-1 and (self.screen[y+1, x, :] == self.FEAT_SPACE).all()
+
+        if action == self.ACTION_JUMP and not is_in_air():
+            # jump!
+            if y > 0:
+                y -= 1
+        elif is_in_air():
+            # gravity.
+            y += 1
+
+        self.sprite = [y, x]
+
+        # scene transition.
         self.time += 1
         self.stage = self.stage[:, 1:, :]
         self.screen = self.stage[:, :self.W, :]
 
-        # peform agent action.
-        [y, x] = self.sprite
-        if action == self.ACTION_JUMP and not self.state['in-air']:
-            # jump!
-            self.state['in-air'] = True
-            if y > 0:
-                y -= 1
-        else:
-            if y < H-1 and (self.screen[y+1, x, :] == self.FEAT_SPACE).all():
-                # gravity.
-                y += 1
-            if y == H-1 or not (self.screen[y+1, x, :] == self.FEAT_SPACE).all():
-                self.state['in-air'] = False
-        self.sprite = [y, x]
 
     def render(self):
         ''' render screen and sprite into an np.ndarray '''

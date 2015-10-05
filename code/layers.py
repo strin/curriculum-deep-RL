@@ -54,6 +54,62 @@ class FullyConnected(object):
             p.set_value(params[p.name], borrow=True)
 
 
+class Conv(object):
+    '''
+    convolution layers.
+    '''
+    def __init__(self, input_dim, output_dim, filter_size = (2, 2), pool_size = (2, 2), activation='relu'):
+        '''
+            TODO: choice of initialization
+                    - Currently uses the initialization scheme for relu
+                      proposed in "Delving Deep into Rectifiers: Surpassing
+                      Human-Level Performance on ImageNet Classification"
+
+                        - zero-mean Gaussian with variance 2/(input_dim)
+
+                  Other choices of activations
+                  - if None, then defaults to a linear layer
+        '''
+        if activation is None:
+            self.act = lambda x: x
+        elif activation is 'relu':
+            self.act = lambda x: T.maximum(x, 0)
+        elif activation is 'tanh':
+            self.act = lambda x: T.tanh(x)
+        else:
+            raise NotImplementedError()
+
+        # initialize weight matrix W of size (input_dim, output_dim)
+        std_dev = np.sqrt(2. / input_dim)
+        W_init = std_dev * np.random.randn(output_dim, input_dim, filter_size[0], filter_size[1])
+        W = theano.shared(value=W_init, name='W')
+
+        # initialize bias vector b of size (output_dim, 1)
+        b_init = np.zeros((output_dim))
+        b = theano.shared(value=b_init, name='b')
+
+        # store parameters
+        self.W = W
+        self.b = b
+        self.filter_size = filter_size
+        self.pool_size = pool_size
+        self.params = [self.W, self.b]
+
+    def __call__(self, inputs):
+        # set-up the outputs
+        conv_out = T.nnet.conv.conv2d(inputs, self.W) + self.b.dimshuffle('x', 0, 'x', 'x')
+        pool_out = T.signal.downsample.max_pool_2d(input=conv_out, ds=self.pool_size, ignore_border=True)
+        return pool_out
+
+    def get_params(self):
+        params = {}
+        for p in self.params:
+            params[p.name] = p.get_value()
+        return params
+
+    def set_params(self, params):
+        for p in self.params:
+            p.set_value(params[p.name], borrow=True)
 
 def orth(A):
     '''

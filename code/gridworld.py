@@ -273,3 +273,107 @@ class GridWorldWithGoals(environment.Task):
             return self.rewards[self.env.state_pos[next_state]]
 
         return 0.  # no reward
+
+class GridWorldUltimate(environment.Task):
+    '''
+        the most complete variant of GridWorld, which includes:
+            agent, goals, grid, demons.
+        the state representation is concatenation of all four.
+    '''
+    def __init__(self, grid, goal, demons, rewards, wall_penalty, gamma):
+        ''' Assumes grid has already been initialized. Rewards is a map of
+            (y, x)-coordinates and the reward for reaching that point
+
+            Parameters
+            =========
+            grid (numpy.ndarray) - the 2D world representation
+            goal (dict {(y,x)->1, ...}) - which cells of the grid the agent tries to reach (beans in pacman).
+            demons (dict {(y,x)->1, ...} - which cells of the grid demons currenty are at.
+
+            (TODO: demons breaks abstraction of env)
+        '''
+        self.wall_penalty = wall_penalty
+        self.gamma = gamma
+        self.env = grid
+        self.goal = goal
+        self.demons = demons
+        self.rewards = rewards
+        # state representation.
+        self.goal_2d = np.zeros_like(self.env.grid)
+        for pos in self.goal:
+            self.goal_2d[pos] = 1.
+        self.goal_resized = self.goal_2d.reshape(-1, 1)
+        self.demons_2d = np.zeros_like(self.env.grid)
+        for pos in self.demons:
+            self.demons_2d[pos] = 1.
+        self.demons_resized = self.demons_2d.reshape(-1, 1)
+        self.grid_resized = self.env.grid.reshape(-1, 1)
+        self.reset()
+
+    def get_state_dimension(self):
+        return self.env.grid.reshape(-1).shape[0] * 4 # grid, agent, demon, goal.
+
+    @staticmethod
+    def create_from_state(state, H, W, action_stoch=0.2, wall_penalty=0., gamma=0.9):
+        '''
+        given state vector representation, create a GridWorldUltimate object.
+        '''
+        world = state[H * W : 2 * H * W].reshape(H, W)
+        grid = Grid(world, action_stoch=action_stoch)
+        def extract_pos_map(mat):
+            non_zeros = zip(*map(list, mat.nonzero()))
+            return {pos: 1 for pos in non_zeros}
+        goal = extract_pos_map(state[2 * H * W : 3 * H * W].reshape(H, W))
+        rewards = dict(goal)
+        demons = extract_pos_map(state[3 * H * W : 4 * H * W].reshape(H, W))
+        return GridWorldUltimate(grid, goal, demons, rewards, wall_penalty=wall_penalty, gamma=gamma)
+
+    def wrap_stateid(self, stateid):
+        agent_state = np.zeros_like(self.env.grid)
+        agent_state[self.env.state_pos[stateid]] = 1.0
+        return self.wrap_state(agent_state)
+
+    def wrap_state(self, state):
+        '''
+        generate a state column vector that represents:
+        [agent, grid, goal, demon]
+        '''
+        state_resized = state.reshape(-1, 1)
+        return np.concatenate((state_resized, self.grid_resized,
+            self.goal_resized, self.demons_resized), axis=0)
+
+    def get_current_state(self):
+        agent_state = np.zeros_like(self.env.grid)
+        agent_state[self.env.state_pos[self.env.get_current_state()]] = 1.0
+        return self.wrap_state(agent_state)
+
+    def perform_action(self, action):
+        curr_state = self.env.get_current_state()
+        next_state = self.env.perform_action(action)
+        reward = self.get_reward(curr_state, action, next_state)
+
+        return (next_state, reward)
+
+    def reset(self):
+        while(self.env.state_pos[self.env.get_current_state()] in self.goal):
+            self.env.reset()
+
+    def get_allowed_actions(self, state):
+        if (self.env.state_pos[state] in self.rewards):
+            return []
+        else:
+            return self.env.get_allowed_actions(state)
+
+    def get_reward(self, state, action, next_state):
+        # returns the reward based on the (s, a, s') triple
+        if (state == next_state):
+            return self.wall_penalty
+
+        if (self.env.state_pos[next_state] in self.rewards):
+            return self.rewards[self.env.state_pos[next_state]]
+
+        return 0.  # no reward
+
+    def next_state_distribution(self, state, action):
+        return self.env.next_state_distribution(self.env.state_pos[state], action)
+

@@ -24,12 +24,17 @@ def make_minibatch_x_y(data, targets, batch_size, num_iter):
     Np = targets.shape[0]
     D = data.shape[1]
     Dp = targets.shape[1]
-    mini_batch = np.zeros((batch_size, D))
+    batch_shape = list(data.shape)
+    batch_shape[0] = batch_size
+    mini_batch = np.zeros(batch_shape)
     mini_batch_targets = np.zeros((batch_size, Dp))
     assert N == Np
     assert batch_size <= N
     for it in range(num_iter):
         ind = npr.choice(range(N), size=batch_size, replace=True)
-        mini_batch[:, :] = data[ind, :]
+        if len(mini_batch.shape) == 2: # matrix data.
+            mini_batch[:, :] = data[ind, :]
+        elif len(mini_batch.shape) == 4: # tensor data.
+            mini_batch[:, :, :, :] = data[ind, :, :, :]
         mini_batch_targets[:, :] = targets[ind, :]
         yield mini_batch, mini_batch_targets
