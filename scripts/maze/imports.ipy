@@ -13,9 +13,13 @@ import matplotlib
 import pylab as plt
 import time
 import pdb
+import random
 from IPython.display import *
 from gridworld import Grid, GridWorldMDP, GridWorld, GridWorldUltimate
-from agent import ValueIterationSolver, TDLearner, DQN, RecurrentReinforceAgent, OracleAgent
+from agent import ValueIterationSolver, TDLearner, RecurrentReinforceAgent, OracleAgent
+from dqn import DQN
 import nn
+import layers
 from task.minipacman import MiniPacmanCNN, MiniPacmanHCNN, MiniPacmanHCNN2
 import theano.tensor as T
+from theano.printing import pydotprint

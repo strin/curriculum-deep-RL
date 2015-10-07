@@ -75,7 +75,7 @@ def load(key):
         return None
 
 def train_test_split(dataset, training_ratio = 0.6):
-    indices = npr.choice(range(len(dataset)), int(len(dataset) * 0.6), replace=True)
+    indices = npr.choice(range(len(dataset)), int(len(dataset) * training_ratio), replace=False)
     train_set = [dataset[ind] for ind in indices]
     test_set = [dataset[ind] for ind in range(len(dataset)) if ind not in indices]
     return (train_set, test_set)

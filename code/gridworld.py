@@ -329,6 +329,9 @@ class GridWorldUltimate(environment.Task):
         return GridWorldUltimate(grid, goal, demons, rewards, wall_penalty=wall_penalty, gamma=gamma)
 
     def wrap_stateid(self, stateid):
+        '''
+        given a state_id, return a column vector representation.
+        '''
         agent_state = np.zeros_like(self.env.grid)
         agent_state[self.env.state_pos[stateid]] = 1.0
         return self.wrap_state(agent_state)
@@ -343,9 +346,7 @@ class GridWorldUltimate(environment.Task):
             self.goal_resized, self.demons_resized), axis=0)
 
     def get_current_state(self):
-        agent_state = np.zeros_like(self.env.grid)
-        agent_state[self.env.state_pos[self.env.get_current_state()]] = 1.0
-        return self.wrap_state(agent_state)
+        return self.env.get_current_state()
 
     def perform_action(self, action):
         curr_state = self.env.get_current_state()
