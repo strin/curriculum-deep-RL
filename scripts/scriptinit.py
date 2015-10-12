@@ -10,8 +10,9 @@ if basename(current_dir) == 'code':
     pass
 elif basename(current_dir) == 'scripts':
     # relevant files are in sibling directory
-    code_dir = join(dirname(current_dir), 'code')
+    code_dir = dirname(current_dir)
     sys.path.insert(0, code_dir)
+    print sys.path
 else:
     raise RuntimeError('Could not find code directory from {}.'.format(current_dir))
 
