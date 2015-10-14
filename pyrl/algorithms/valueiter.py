@@ -6,8 +6,8 @@ import random
 import numpy as np
 import numpy.random as npr
 
-import pyrl.optimizers
-import pyrl.layers
+import pyrl.optimizers as optimizers
+import pyrl.layers as layers
 from pyrl.tasks.task import Task
 from pyrl.agents.agent import DQN
 from pyrl.agents.agent import TabularVfunc
@@ -57,7 +57,7 @@ class ValueIterationSolver(object):
             max_diff = 0.
 
             # TODO: Add priority sweeping for state in xrange(self.num_states):
-            for state in xrange(self.num_states):
+            for state in self.task.env.get_valid_states():
                 poss_actions = self.task.get_allowed_actions(state)
 
                 best_val = 0.
@@ -80,24 +80,35 @@ class ValueIterationSolver(object):
             if max_diff < self.tol:
                 break
 
+
 class DeepQlearn(object):
     '''
     DeepMind's deep Q learning algorithms.
     '''
-    def __init__(self, task, dqn, l2_reg=0.0, lr=1e-3,
-               memory_size=250, minibatch_size=64):
-        self.dqn = dqn
+    def __init__(self, task, dqn_mt, l2_reg=0.0, lr=1e-3,
+               memory_size=250, minibatch_size=64, epsilon=0.05):
+        '''
+        (TODO): task should be task info.
+        we don't use all of task properties/methods here.
+        only gamma and state dimension.
+        and we allow task switching.
+        '''
+        self.dqn = dqn_mt
         self.l2_reg = l2_reg
         self.lr = lr
+        self.epsilon = epsilon
         self.memory_size = memory_size
         self.minibatch_size = minibatch_size
+        self.state_dim = task.get_state_dimension()
+        self.gamma = task.gamma
+        self.task = task
 
         # for now, keep experience as a list of tuples
         self.experience = []
         self.exp_idx = 0
 
         # used for streaming updates
-        self.last_state = None
+        self.last_state_vector = None
         self.last_action = None
 
         # compile back-propagtion network
@@ -130,6 +141,7 @@ class DeepQlearn(object):
     def _add_to_experience(self, s, a, ns, r):
         # TODO: improve experience replay mechanism by making it harder to
         # evict experiences with high td_error, for example
+        # s, ns are state_vectors.
         if len(self.experience) < self.memory_size:
             self.experience.append((s, a, ns, r))
         else:
@@ -157,43 +169,46 @@ class DeepQlearn(object):
         samples = random.sample(self.experience, self.minibatch_size)
         terminals = []
         for idx, sample in enumerate(samples):
-            state, action, next_state, reward = sample
-            states[idx, :] = state.reshape(-1)
+            state_vector, action, next_state_vector, reward = sample
+
+            states[idx, :] = state_vector.reshape(-1)
             actions[idx] = action
             rewards[idx] = reward
 
-            if next_state is not None:
-                next_states[idx, :] = next_state.reshape(-1)
+            if next_state_vector is not None:
+                next_states[idx, :] = next_state_vector.reshape(-1)
             else:
                 terminals.append(idx)
 
         # compute target reward + \gamma max_{a'} Q(ns, a')
-        next_qvals = np.max(self.dqn.apply(next_states), axis=1)
+        next_qvals = np.max(self.dqn.fprop(next_states), axis=1)
 
         # Ensure target = reward when NEXT_STATE is terminal
         next_qvals[terminals] = 0.
 
-        targets = rewards + self.gamma * next_qvals
+        targets = rewards + self.task.gamma * next_qvals
 
         self.bprop(states, actions, targets.flatten())
 
-    def _learn(self, next_state, reward):
-        self._add_to_experience(self.last_state, self.last_action,
-                                next_state, reward)
+    def _learn(self, next_state_vector, reward):
+        self._add_to_experience(self.last_state_vector, self.last_action,
+                                next_state_vector, reward)
         self._update_net()
 
     def _end_episode(self, reward):
-        if self.last_state is not None:
-            self._add_to_experience(self.last_state, self.last_action, None,
+        if self.last_state_vector is not None:
+            self._add_to_experience(self.last_state_vector, self.last_action, None,
                                     reward)
-        self.last_state = None
+        self.last_state_vector = None
         self.last_action = None
 
-    def run(self, num_episodes = 1):
-        task = self.task
-        agent = self.dqn
+
+    def run(self, num_episodes = 1, task = None):
+        if task == None:
+            task = self.task # use default task.
 
         for episode in xrange(num_episodes):
+            task.reset()
             while task.is_terminal():
                 task.reset()
 
@@ -204,22 +219,26 @@ class DeepQlearn(object):
                 # TODO: Hack!
                 if num_steps >= 200:
                     # print 'Lying and tell the agent the episode is over!'
-                    agent.end_episode(0)
+                    self._end_episode(0)
+                    # break
                     num_steps = 0.
 
-                action = agent.get_action(curr_state)
+                curr_state_vector = task.wrap_stateid(curr_state)
+                action = self.dqn.get_action(curr_state_vector, method='eps-greedy', epsilon=self.epsilon)
+                self.last_state_vector = curr_state_vector
+                self.last_action = action
+
                 next_state, reward = task.perform_action(action)
+                next_state_vector = task.wrap_stateid(next_state)
 
                 if task.is_terminal():
                     self._end_episode(reward)
                     break
                 else:
-                    self._learn(next_state, reward)
+                    self._learn(next_state_vector, reward)
                     curr_state = next_state
 
                 num_steps += 1
-
-
 
 
 

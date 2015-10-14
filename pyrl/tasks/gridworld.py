@@ -34,15 +34,14 @@ class Grid(Environment):
         pos = []
         self.state_id = {}
         self.state_pos = {}
-        state_num = 0
         w, h = self.grid.shape
         for i in xrange(w):
             for j in xrange(h):
                 if self.grid[i][j] == 0.:
+                    state_num = i * h + j
                     pos.append((i, j))
                     self.state_id[(i, j)] = state_num
                     self.state_pos[state_num] = (i, j)
-                    state_num += 1
         return pos
 
     @property
@@ -52,7 +51,12 @@ class Grid(Environment):
     def support_tabular(self):
         return True
 
+    def get_valid_states(self):
+        ''' get all states without dummy ones '''
+        return self.state_pos.keys()
+
     def get_num_states(self):
+        ''' can have dummy states '''
         return self.num_states
 
     def get_state_dimension(self):
@@ -207,11 +211,14 @@ class GridWorldUltimate(Task):
         self.grid_resized = self.env.grid.reshape(-1, 1)
         self.reset()
 
+    def get_valid_states(self):
+        return self.env.get_valid_states()
+
     def get_num_states(self):
         return self.env.get_num_states()
 
     def get_state_dimension(self):
-        return self.env.grid.reshape(-1).shape[0] * 4 # grid, agent, demon, goal.
+        return self.env.grid.reshape(-1).shape[0] * 2 # grid, agent, demon, goal.
 
     def get_current_state(self):
         return self.env.get_current_state()
@@ -248,8 +255,8 @@ class GridWorldUltimate(Task):
         [agent, grid, goal, demon]
         '''
         state_resized = state.reshape(-1, 1)
-        return np.concatenate((state_resized, self.grid_resized,
-            self.goal_resized, self.demons_resized), axis=0)
+        return np.concatenate((state_resized,
+            self.goal_resized), axis=0)
 
     def get_state_vector(self, state):
         '''
@@ -279,6 +286,9 @@ class GridWorldUltimate(Task):
             return []
         else:
             return self.env.get_allowed_actions(state)
+
+    def get_num_actions(self):
+        return self.env.get_num_actions()
 
     def get_reward(self, state, action, next_state):
         # returns the reward based on the (s, a, s') triple
