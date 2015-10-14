@@ -212,7 +212,7 @@ class GridWorldUltimate(Task):
         self.reset()
 
     def get_valid_states(self):
-        return self.env.get_valid_states()
+        return [key for key in self.env.get_valid_states() if self.env.state_pos[key] not in self.rewards]
 
     def get_num_states(self):
         return self.env.get_num_states()

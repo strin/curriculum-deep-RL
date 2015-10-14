@@ -1,5 +1,4 @@
 # algorithms from UVFA: universal function value approximation.
-from multiprocessing import Pool
 import numpy as np
 import theano
 import theano.tensor as T
@@ -7,23 +6,6 @@ import theano.tensor as T
 from pyrl.algorithms.valueiter import ValueIterationSolver
 from pyrl.agents.agent import Qfunc
 
-def compute_tabular_value(task):
-    solver = ValueIterationSolver(task)
-    solver.learn()
-    return solver.vfunc.V
-
-def eval_tabular_value(task, func):
-    V = np.zeros(task.get_num_states())
-    for state in range(task.get_num_states()):
-        V[state] = func(state)
-    return V
-
-def compute_tabular_values(tasks, num_cores = 8):
-    ''' take a list of tabular tasks, and return states x tasks value matrix.
-    '''
-    pool = Pool(num_cores)
-    vals = pool.map(compute_tabular_value, tasks)
-    return np.transpose(np.array(vals))
 
 def factorize_value_matrix(valmat, rank_n = 3, num_iter = 10000):
     from optspace import optspace

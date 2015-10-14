@@ -242,6 +242,19 @@ class DeepQlearn(object):
 
 
 
+def compute_tabular_value(task, tol=1e-4):
+    solver = ValueIterationSolver(task, tol=tol)
+    solver.learn()
+    return solver.vfunc.V
 
+def eval_tabular_value(task, func):
+    V = np.zeros(task.get_num_states())
+    for state in range(task.get_num_states()):
+        V[state] = func(state)
+    return V
 
-
+def compute_tabular_values(tasks, num_cores = 8):
+    ''' take a list of tabular tasks, and return states x tasks value matrix.
+    '''
+    vals = map(compute_tabular_value, tasks)
+    return np.transpose(np.array(vals))

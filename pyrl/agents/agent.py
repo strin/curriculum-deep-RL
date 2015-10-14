@@ -59,11 +59,11 @@ class Qfunc(object):
 
     def get_action_distribution(self, state, **kwargs):
         '''
-        return a dict of action -> log probability.
+        return a dict of action -> probability.
         '''
         # deterministic action.
         action = self.get_action(state)
-        return {action: 0.}
+        return {action: 1.}
 
     def is_tabular(self):
         '''
@@ -122,12 +122,12 @@ class DQN(Qfunc):
         state_vector = state_vector.reshape(1, -1)
 
         # uniform distribution.
-        log_probs = [epsilon / self.task.get_num_actions()] * self.task.get_num_actions()
+        probs = [epsilon / self.task.get_num_actions()] * self.task.get_num_actions()
 
         # increase probability at greedy action..
         action = np.argmax(self.fprop(state_vector))
-        log_probs[action] += 1-epsilon
-        return log_probs
+        probs[action] += 1-epsilon
+        return probs
 
     def _get_eps_greedy_action(self, state_vector, epsilon):
         # transpose since the DQN expects row vectors
@@ -145,11 +145,10 @@ class DQN(Qfunc):
         state_vector = state_vector.reshape(1, -1)
         qvals = self.fprop(state_vector).reshape(-1)
         qvals = qvals / temperature
-        return prob.normalize_log(qvals)
+        return np.exp(prob.normalize_log(qvals))
 
     def _get_softmax_action(self, state_vector, temperature):
-        log_probs = self._get_softmax_action_distribution(state_vector, temperature)
-        probs = np.exp(log_probs)
+        probs = self._get_softmax_action_distribution(state_vector, temperature)
         return npr.choice(range(self.task.get_num_actions()), 1, replace=True, p=probs)[0]
 
     def get_action(self, state_vector, **kwargs):
