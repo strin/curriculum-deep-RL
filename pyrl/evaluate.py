@@ -59,3 +59,8 @@ def expected_reward_tabular_normalized(policy, task, tol=1e-4):
     rewards = [V[state] / gtV[state] for state in task.get_valid_states()]
     return np.mean(rewards)
 
+def eval_dataset(policy, tasks, method=expected_reward_tabular_normalized):
+    reward = 0.0
+    for task in tasks:
+        reward += method(policy, task, tol=1e-4)
+    return reward / len(tasks)

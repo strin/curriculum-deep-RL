@@ -220,7 +220,7 @@ class DeepQlearn(object):
                 if num_steps >= 200:
                     # print 'Lying and tell the agent the episode is over!'
                     self._end_episode(0)
-                    # break
+                    break
                     num_steps = 0.
 
                 curr_state_vector = task.wrap_stateid(curr_state)

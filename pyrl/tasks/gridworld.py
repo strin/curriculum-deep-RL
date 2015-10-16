@@ -303,6 +303,11 @@ class GridWorldUltimate(Task):
     def next_state_distribution(self, state, action):
         return self.env.next_state_distribution(self.env.state_pos[state], action)
 
+    def show_V(v, H, W):
+        plt.imshow(v.reshape(H, W), interpolation='none')
+        plt.axis('off')
+        print v
+
 def generate_gridworlds(world, action_stoch=0.2, wall_penalty=0., gamma=0.9):
     grid = Grid(world, action_stoch=action_stoch)
     gridworlds = []
@@ -314,5 +319,4 @@ def generate_gridworlds(world, action_stoch=0.2, wall_penalty=0., gamma=0.9):
             GridWorldUltimate(grid, goal, demons, rewards=rewards, wall_penalty=wall_penalty, gamma=gamma)
         )
     return gridworlds
-
 
