@@ -308,6 +308,22 @@ class GridWorldUltimate(Task):
         plt.axis('off')
         print v
 
+    def __repr__(self):
+        return str(self.goal.keys()[0])
+
+class GridWorldUltimateFixedStart(GridWorldUltimate):
+    def __init__(self, start_state, **kwargs):
+        self.start_state = start_state
+        GridWorldUltimate.__init__(self, **kwargs)
+
+    def reset(self):
+        self.env.hit_wall = False
+        self.env.curr_state = self.env.state_pos[self.start_state]
+
+    def __repr__(self):
+        return str(self.env.state_pos[self.start_state]) + ' -> ' + str(self.goal.keys()[0])
+
+
 def generate_gridworlds(world, action_stoch=0.2, wall_penalty=0., gamma=0.9):
     grid = Grid(world, action_stoch=action_stoch)
     gridworlds = []
@@ -318,5 +334,25 @@ def generate_gridworlds(world, action_stoch=0.2, wall_penalty=0., gamma=0.9):
         gridworlds.append(
             GridWorldUltimate(grid, goal, demons, rewards=rewards, wall_penalty=wall_penalty, gamma=gamma)
         )
+    return gridworlds
+
+def generate_gridworlds_fixed_start_state(world, action_stoch=0.2, wall_penalty=0., gamma=0.9):
+    grid = Grid(world, action_stoch=action_stoch)
+    # create candidate grid worlds.
+    gridworlds = dict()
+    for goal_pos in grid.free_pos:
+        for start_pos in grid.free_pos:
+            if start_pos == goal_pos:
+                continue
+            start_state = grid.state_id[start_pos]
+            goal = {goal_pos: 1.}
+            rewards = dict(goal)
+            demons = {}
+            dist = np.abs(start_pos[0] - goal_pos[0]) + np.abs(start_pos[1] - goal_pos[1])
+            if dist not in gridworlds:
+                gridworlds[dist] = []
+            gridworlds[dist].append(
+                GridWorldUltimateFixedStart(start_state, grid_env=grid, goal=goal, demons=demons, rewards=rewards, wall_penalty=wall_penalty, gamma=gamma)
+            )
     return gridworlds
 

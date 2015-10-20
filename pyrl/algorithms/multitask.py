@@ -33,6 +33,50 @@ class SingleLearnerSequential(object):
             self.dqn.task = task
             # run training.
             self.deepQlearn.run(num_episodes, task)
+            self.t += 1
+
+class SingleLearnerRandom(object):
+    def __init__(self, dqn, tasks, **kwargs):
+        self.dqn = dqn
+        self.tasks = tasks
+        self.num_tasks = len(self.tasks)
+        self.deepQlearn = DeepQlearn(tasks[0], dqn, **kwargs)
+        self.last_task_ti = 0
+
+    def run(self, num_epochs=1, num_episodes=1):
+        for ei in range(num_epochs):
+            ti = npr.choice(range(self.num_tasks), 1)[0]
+            self.last_task_ti = ti
+            task = self.tasks[ti]
+
+            # (TODO) this breaks away the abstraction.
+            self.deepQlearn.task = task
+            self.dqn.task = task
+            # run training.
+            self.deepQlearn.run(num_episodes, task)
+
+class SingleLearnerCommunist(object):
+    def __init__(self, dqn, tasks, **kwargs):
+        self.dqn = dqn
+        self.tasks = tasks
+        self.num_tasks = len(self.tasks)
+        self.deepQlearn = DeepQlearn(tasks[0], dqn, **kwargs)
+        self.last_task_ti = 0
+
+    def run(self, num_epochs=1, num_episodes=1):
+        for ei in range(num_epochs):
+            task_performance = np.zeros(self.num_tasks)
+            for ti in range(self.num_tasks):
+                task_performance[ti] = expected_reward_tabular_normalized(self.dqn, self.tasks[ti], tol=1e-4)
+            ti = np.argmin(task_performance)
+            task = self.tasks[ti]
+            self.last_task_ti = ti
+
+            # (TODO) this breaks away the abstraction.
+            self.deepQlearn.task = task
+            self.dqn.task = task
+            # run training.
+            self.deepQlearn.run(num_episodes, task)
 
 class SingleLearnerMAB(object):
     def __init__(self, dqn, tasks, mab_gamma, mab_scale, mab_batch_size, **kwargs):

@@ -105,6 +105,7 @@ class DeepQlearn(object):
 
         # for now, keep experience as a list of tuples
         self.experience = []
+        self.experience_task = [] # which task an experience example comes from.
         self.exp_idx = 0
 
         # used for streaming updates
@@ -144,8 +145,10 @@ class DeepQlearn(object):
         # s, ns are state_vectors.
         if len(self.experience) < self.memory_size:
             self.experience.append((s, a, ns, r))
+            self.experience_task.append(self.task)
         else:
             self.experience[self.exp_idx] = (s, a, ns, r)
+            self.experience_task[self.exp_idx] = self.task
             self.exp_idx += 1
             if self.exp_idx >= self.memory_size:
                 self.exp_idx = 0
