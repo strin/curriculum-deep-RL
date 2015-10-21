@@ -196,7 +196,6 @@ class DeepQlearn(object):
     def _learn(self, next_state_vector, reward):
         self._add_to_experience(self.last_state_vector, self.last_action,
                                 next_state_vector, reward)
-        self._update_net()
 
     def _end_episode(self, reward):
         if self.last_state_vector is not None:
@@ -206,11 +205,12 @@ class DeepQlearn(object):
         self.last_action = None
 
 
-    def run(self, num_episodes = 1, task = None):
+    def run(self, budget = 100, task = None):
         if task == None:
             task = self.task # use default task.
 
-        for episode in xrange(num_episodes):
+        total_steps = 0.
+        while True:
             task.reset()
             while task.is_terminal():
                 task.reset()
@@ -220,11 +220,10 @@ class DeepQlearn(object):
             num_steps = 0.
             while True:
                 # TODO: Hack!
-                if num_steps >= 200:
+                if num_steps >= task.horizon:
                     # print 'Lying and tell the agent the episode is over!'
                     self._end_episode(0)
                     break
-                    num_steps = 0.
 
                 curr_state_vector = task.wrap_stateid(curr_state)
                 action = self.dqn.get_action(curr_state_vector, method='eps-greedy', epsilon=self.epsilon)
@@ -242,7 +241,10 @@ class DeepQlearn(object):
                     curr_state = next_state
 
                 num_steps += 1
+                total_steps += 1
 
+                if total_steps >= budget:
+                    return
 
 
 def compute_tabular_value(task, tol=1e-4):

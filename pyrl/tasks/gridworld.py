@@ -323,6 +323,18 @@ class GridWorldUltimateFixedStart(GridWorldUltimate):
     def __repr__(self):
         return str(self.env.state_pos[self.start_state]) + ' -> ' + str(self.goal.keys()[0])
 
+class GridWorldUltimateFixedStartFixedHorizon(GridWorldUltimate):
+    def __init__(self, start_state, horizon, **kwargs):
+        self.start_state = start_state
+        self.horizon = horizon
+        GridWorldUltimate.__init__(self, **kwargs)
+
+    def reset(self):
+        self.env.hit_wall = False
+        self.env.curr_state = self.env.state_pos[self.start_state]
+
+    def __repr__(self):
+        return str(self.env.state_pos[self.start_state]) + ' -> ' + str(self.goal.keys()[0])
 
 def generate_gridworlds(world, action_stoch=0.2, wall_penalty=0., gamma=0.9):
     grid = Grid(world, action_stoch=action_stoch)

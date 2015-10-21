@@ -23,7 +23,7 @@ class SingleLearnerSequential(object):
         self.deepQlearn = DeepQlearn(tasks[0], dqn, **kwargs)
         self.t = 0
 
-    def run(self, num_epochs=1, num_episodes=1):
+    def run(self, num_epochs=1, budget=100):
         for ei in range(num_epochs):
             ti = self.t % self.num_tasks
             task = self.tasks[ti]
@@ -32,8 +32,10 @@ class SingleLearnerSequential(object):
             self.deepQlearn.task = task
             self.dqn.task = task
             # run training.
-            self.deepQlearn.run(num_episodes, task)
+            self.deepQlearn.run(budget, task)
             self.t += 1
+            for it in range(budget):
+                self.deepQlearn._update_net()
 
 class SingleLearnerRandom(object):
     def __init__(self, dqn, tasks, **kwargs):
