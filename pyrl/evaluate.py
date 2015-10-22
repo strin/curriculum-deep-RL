@@ -17,7 +17,7 @@ def reward_tabular(policy, task, tol=1e-4):
         for state in task.get_valid_states():
             if not policy.is_tabular():
                 state_vector = task.wrap_stateid(state)
-                poss_actions = policy.get_action_distribution(state_vector, method='softmax', temperature=0.1)
+                poss_actions = policy.get_action_distribution(state_vector, method='eps-greedy', epsilon=0.0)
             else:
                 poss_actions = policy.get_action_distribution(state)
 
@@ -64,6 +64,17 @@ def reward_tabular_normalized(states, policy, task, tol=1e-4):
     compute the expected reward / reward by value iteration
     averaged over states.
     '''
+    gtV = compute_tabular_value(task, tol) # ground truth values by value iteration.
+    V = reward_tabular(policy, task, tol)
+    rewards = {state: V[state] / gtV[state] for state in task.get_valid_states()}
+    return np.mean([rewards[state] for state in states])
+
+def reward_tabular_normalized_fix_start(policy, task, tol=1e-4):
+    '''
+    compute the expected reward / reward by value iteration
+    averaged over states.
+    '''
+    states = [task.start_state]
     gtV = compute_tabular_value(task, tol) # ground truth values by value iteration.
     V = reward_tabular(policy, task, tol)
     rewards = {state: V[state] / gtV[state] for state in task.get_valid_states()}

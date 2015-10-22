@@ -196,6 +196,7 @@ class DeepQlearn(object):
     def _learn(self, next_state_vector, reward):
         self._add_to_experience(self.last_state_vector, self.last_action,
                                 next_state_vector, reward)
+        self._update_net()
 
     def _end_episode(self, reward):
         if self.last_state_vector is not None:
@@ -220,7 +221,7 @@ class DeepQlearn(object):
             num_steps = 0.
             while True:
                 # TODO: Hack!
-                if num_steps >= task.horizon:
+                if num_steps >= 200:
                     # print 'Lying and tell the agent the episode is over!'
                     self._end_episode(0)
                     break
