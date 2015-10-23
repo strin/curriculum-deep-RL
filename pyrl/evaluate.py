@@ -3,10 +3,25 @@ import numpy.random as npr
 from pyrl.tasks.task import Environment, Task
 from pyrl.algorithms.valueiter import compute_tabular_value
 
+def reward_stochastic(policy, task, num_trials = 100, tol=1e-6):
+    total_reward = 0.
+    for ni in range(num_trials):
+        num_steps = 0
+        task.reset()
+        while num_steps < np.log(tol) / np.log(task.gamma):
+            curr_state = task.get_current_state()
+            curr_state_vector = task.wrap_stateid(curr_state)
+            action = policy.get_action(curr_state_vector, method='eps-greedy', epsilon=0.)
+            next_state, reward = task.perform_action(action)
+            total_reward += reward
+            num_steps += 1
+    return total_reward / num_trials
+
 def reward_tabular(policy, task, tol=1e-4):
     '''
     compute exactly expected rewards averaged over start states.
     '''
+    policy.task = task # configure the policy task in the multi-task setting.
     V = np.zeros(task.get_num_states())
     while True:
         # repeatedly perform reward bootstrapping on each state
@@ -18,6 +33,7 @@ def reward_tabular(policy, task, tol=1e-4):
             if not policy.is_tabular():
                 state_vector = task.wrap_stateid(state)
                 poss_actions = policy.get_action_distribution(state_vector, method='eps-greedy', epsilon=0.0)
+                # poss_actions = policy.get_action_distribution(state_vector, method='softmax', temperature=1e-3)
             else:
                 poss_actions = policy.get_action_distribution(state)
 

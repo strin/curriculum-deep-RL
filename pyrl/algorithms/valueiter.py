@@ -206,9 +206,8 @@ class DeepQlearn(object):
         self.last_action = None
 
 
-    def run(self, budget = 100, task = None):
-        if task == None:
-            task = self.task # use default task.
+    def run(self, budget = 100, tol=1e-6):
+        task = self.task
 
         total_steps = 0.
         while True:
@@ -221,7 +220,7 @@ class DeepQlearn(object):
             num_steps = 0.
             while True:
                 # TODO: Hack!
-                if num_steps >= 200:
+                if num_steps >= np.log(tol) / np.log(task.gamma):
                     # print 'Lying and tell the agent the episode is over!'
                     self._end_episode(0)
                     break
