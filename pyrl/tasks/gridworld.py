@@ -321,7 +321,7 @@ class GridWorldUltimateFixedStart(GridWorldUltimate):
         self.env.curr_state = self.env.state_pos[self.start_state]
 
     def __repr__(self):
-        return str(self.env.state_pos[self.start_state]) + ' -> ' + str(self.goal.keys()[0])
+        return str(self.env.state_pos[self.start_state]) + ' -> ' + str(self.goal.keys()[0]) + ' ' + str(self.gamma)
 
 class GridWorldUltimateFixedStartFixedHorizon(GridWorldUltimate):
     def __init__(self, start_state, horizon, **kwargs):
@@ -334,7 +334,7 @@ class GridWorldUltimateFixedStartFixedHorizon(GridWorldUltimate):
         self.env.curr_state = self.env.state_pos[self.start_state]
 
     def __repr__(self):
-        return str(self.env.state_pos[self.start_state]) + ' -> ' + str(self.goal.keys()[0])
+        return str(self.env.state_pos[self.start_state]) + ' -> ' + str(self.goal.keys()[0]) + ' ' + str(self.gamma)
 
 def generate_gridworlds(world, action_stoch=0.2, wall_penalty=0., gamma=0.9):
     grid = Grid(world, action_stoch=action_stoch)

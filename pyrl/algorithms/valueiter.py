@@ -8,6 +8,8 @@ import numpy.random as npr
 
 import pyrl.optimizers as optimizers
 import pyrl.layers as layers
+import pyrl.prob as prob
+from pyrl.utils import Timer
 from pyrl.tasks.task import Task
 from pyrl.agents.agent import DQN
 from pyrl.agents.agent import TabularVfunc
@@ -246,6 +248,197 @@ class DeepQlearn(object):
                 if total_steps >= budget:
                     return
 
+class AdaDeepQlearn(object):
+    '''
+    DeepQlearn based on the teleportation idea.
+    '''
+    def __init__(self, task, dqn_mt, tau=1.0, l2_reg=0.0, lr=1e-3, minibatch_size=64, epsilon=0.05):
+        '''
+        (TODO): task should be task info.
+        we don't use all of task properties/methods here.
+        only gamma and state dimension.
+        and we allow task switching.
+        '''
+        self.dqn = dqn_mt
+        self.l2_reg = l2_reg
+        self.lr = lr
+        self.epsilon = epsilon
+        self.minibatch_size = minibatch_size
+        self.state_dim = task.get_state_dimension()
+        self.gamma = task.gamma
+        self.task = task
+
+        # for now, keep experience as a list of tuples
+        self.experience = []
+        self.painful_experience = []
+
+        # used for streaming updates
+        self.last_state_vector = None
+        self.last_action = None
+
+        # compile back-propagtion network
+        self._compile_bp()
+
+    def _compile_bp(self):
+        states = self.dqn.states
+        action_values = self.dqn.action_values
+        params = self.dqn.params
+        targets = T.vector('target')
+        last_actions = T.lvector('action')
+
+        # loss function.
+        mse = layers.MSE(action_values[T.arange(action_values.shape[0]),
+                            last_actions], targets)
+        # l2 penalty.
+        l2_penalty = 0.
+        for param in params:
+            l2_penalty += (param ** 2).sum()
+
+        cost = mse + self.l2_reg * l2_penalty
+
+        # back propagation.
+        updates = optimizers.Adam(cost, params, alpha=self.lr)
+
+        td_errors = T.sqrt(mse)
+        self.bprop = theano.function(inputs=[states, last_actions, targets],
+                                     outputs=td_errors, updates=updates)
+
+    def _add_to_experience(self, s, a, ns, r):
+        # TODO: improve experience replay mechanism by making it harder to
+        # evict experiences with high td_error, for example
+        # s, ns are state_vectors.
+        # self.experience_set.add((s, a, ns, r))
+        self.experience.append((s, a, ns, r))
+
+    def _update_net(self):
+        '''
+            sample from the memory dataset and perform gradient descent on
+            (target - Q(s, a))^2
+        '''
+        states = np.zeros((self.minibatch_size, self.state_dim,))
+        next_states = np.zeros((self.minibatch_size, self.state_dim))
+        actions = np.zeros(self.minibatch_size, dtype=int)
+        rewards = np.zeros(self.minibatch_size)
+
+        # compute vals.
+        vals = np.zeros(len(self.experience))
+        delta = np.zeros(len(self.experience))
+        for idx_offset in range(0, len(self.experience), self.minibatch_size):
+            terminals = []
+            next_offset = min(idx_offset + self.minibatch_size, len(self.experience))
+            for idx in range(idx_offset, next_offset):
+                state_vector, action, next_state_vector, reward = self.experience[idx]
+                states[idx - idx_offset, :] = state_vector.reshape(-1)
+                rewards[idx - idx_offset] = reward
+                actions[idx - idx_offset] = action
+                if next_state_vector is not None:
+                    next_states[idx - idx_offset, :] = next_state_vector.reshape(-1)
+                else:
+                    terminals.append(idx - idx_offset)
+            this_vals = np.max(self.dqn.fprop(states), axis=1)
+            #this_vals = self.dqn.fprop(states)[np.arange(self.minibatch_size), actions]
+            next_vals = np.max(self.dqn.fprop(next_states), axis=1)
+            next_vals[terminals] = 0.
+            targets = rewards + self.task.gamma * next_vals
+            vals[idx_offset:next_offset] = this_vals[0:next_offset-idx_offset]
+            delta[idx_offset:next_offset] = targets[0:next_offset-idx_offset] - this_vals[0:next_offset-idx_offset]
+        print 'vals', max(vals)
+        print 'delta', delta
+        log_p = prob.normalize_log(np.abs(delta) * 1e1)
+        p = np.exp(log_p)
+        print 'prob', p, 'max_prob', max(p)
+        indices = prob.choice(range(len(self.experience)), 256, replace=True, p=p)
+        print indices
+        painful_samples = prob.choice(self.experience, 256, replace=True, p=p)
+        # print [p[ind] for ind in np.argsort(log_p)[-1:-256-1:-1]]
+        # painful_samples = [self.experience[ind] for ind in np.argsort(log_p)[-1:-256-1:-1]]
+        self.painful_experience.extend(painful_samples)
+        if len(self.painful_experience) > 1000:
+            self.painful_experience = self.painful_experience[-1000:]
+
+        for it in range(1 + int(len(self.painful_experience) / self.minibatch_size)):
+            # sample and process minibatch
+            samples = prob.choice(self.painful_experience, self.minibatch_size, replace=True)
+            terminals = []
+            for idx, sample in enumerate(samples):
+                state_vector, action, next_state_vector, reward = sample
+
+                states[idx, :] = state_vector.reshape(-1)
+                actions[idx] = action
+                rewards[idx] = reward
+
+                if next_state_vector is not None:
+                    next_states[idx, :] = next_state_vector.reshape(-1)
+                else:
+                    terminals.append(idx)
+
+            # compute target reward + \gamma max_{a'} Q(ns, a')
+            next_qvals = np.max(self.dqn.fprop(next_states), axis=1)
+
+            # Ensure target = reward when NEXT_STATE is terminal
+            next_qvals[terminals] = 0.
+
+            targets = rewards + self.task.gamma * next_qvals
+
+            self.bprop(states, actions, targets.flatten())
+
+    def _learn(self, next_state_vector, reward):
+        self._add_to_experience(self.last_state_vector, self.last_action,
+                                next_state_vector, reward)
+
+    def _end_episode(self, reward):
+        if self.last_state_vector is not None:
+            self._add_to_experience(self.last_state_vector, self.last_action, None,
+                                    reward)
+        self.last_state_vector = None
+        self.last_action = None
+
+    def run(self, num_epochs = 1, budget=10, tol=1e-6):
+        task = self.task
+
+        total_steps = 0.
+        for ei in range(num_epochs):
+            self.experience = []
+            for state in task.get_valid_states():
+                task.env.curr_state = task.env.state_pos[state]
+                if task.is_terminal():
+                    continue
+
+                while True:
+                    task.curr_state = state
+
+                    curr_state = task.get_current_state()
+
+                    num_steps = 0.
+                    while True:
+                        if num_steps >= np.log(tol) / np.log(task.gamma) or num_steps >= budget:
+                            # print 'Lying and tell the agent the episode is over!'
+                            self._end_episode(0)
+                            break
+
+                        curr_state_vector = task.wrap_stateid(curr_state)
+                        action = self.dqn.get_action(curr_state_vector, method='eps-greedy', epsilon=self.epsilon)
+                        self.last_state_vector = curr_state_vector
+                        self.last_action = action
+
+                        next_state, reward = task.perform_action(action)
+                        next_state_vector = task.wrap_stateid(next_state)
+
+                        if task.is_terminal():
+                            self._end_episode(reward)
+                            break
+                        else:
+                            self._learn(next_state_vector, reward)
+                            curr_state = next_state
+
+                        num_steps += 1
+                        total_steps += 1
+                    if num_steps >= budget or task.is_terminal():
+                        break
+
+            # learn for one pass.
+            print 'experience', len(self.experience)
+            self._update_net()
 
 def compute_tabular_value(task, tol=1e-4):
     solver = ValueIterationSolver(task, tol=tol)
