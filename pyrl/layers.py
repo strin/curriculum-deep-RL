@@ -293,6 +293,13 @@ class LSTMLayer(object):
 #######################
 #  OBJECTIVES         #
 #######################
+def SVR(inputs, targets, eps=0.3):
+    '''
+        Computes the MSE between inputs and targets
+    '''
+    delta = T.sqrt(T.sqr(inputs - targets))
+    return T.mean((delta - eps) * (delta > eps))
+
 def MSE(inputs, targets):
     '''
         Computes the MSE between inputs and targets

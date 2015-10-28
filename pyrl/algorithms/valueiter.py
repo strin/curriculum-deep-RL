@@ -271,9 +271,10 @@ class AdaDeepQlearn(object):
         # for now, keep experience as a list of tuples
         self.experience = []
         self.painful_experience = []
+        self.Idict = {}
 
         # used for streaming updates
-        self.last_state_vector = None
+        self.last_state = None
         self.last_action = None
 
         # compile back-propagtion network
@@ -321,53 +322,63 @@ class AdaDeepQlearn(object):
         rewards = np.zeros(self.minibatch_size)
 
         # compute vals.
-        vals = np.zeros(len(self.experience))
-        delta = np.zeros(len(self.experience))
-        for idx_offset in range(0, len(self.experience), self.minibatch_size):
-            terminals = []
-            next_offset = min(idx_offset + self.minibatch_size, len(self.experience))
-            for idx in range(idx_offset, next_offset):
-                state_vector, action, next_state_vector, reward = self.experience[idx]
-                states[idx - idx_offset, :] = state_vector.reshape(-1)
-                rewards[idx - idx_offset] = reward
-                actions[idx - idx_offset] = action
-                if next_state_vector is not None:
-                    next_states[idx - idx_offset, :] = next_state_vector.reshape(-1)
-                else:
-                    terminals.append(idx - idx_offset)
-            this_vals = np.max(self.dqn.fprop(states), axis=1)
-            #this_vals = self.dqn.fprop(states)[np.arange(self.minibatch_size), actions]
-            next_vals = np.max(self.dqn.fprop(next_states), axis=1)
-            next_vals[terminals] = 0.
-            targets = rewards + self.task.gamma * next_vals
-            vals[idx_offset:next_offset] = this_vals[0:next_offset-idx_offset]
-            delta[idx_offset:next_offset] = targets[0:next_offset-idx_offset] - this_vals[0:next_offset-idx_offset]
-        print 'vals', max(vals)
-        print 'delta', delta
-        log_p = prob.normalize_log(np.abs(delta) * 1e1)
+        Is = np.zeros(len(self.experience))
+        log_p = np.zeros(len(self.experience))
+        def compute_action_values():
+            q = np.zeros(len(self.experience))
+            for idx_offset in range(0, len(self.experience), self.minibatch_size):
+                next_offset = min(idx_offset + self.minibatch_size, len(self.experience))
+                for idx in range(idx_offset, next_offset):
+                    state, action, next_state, reward = self.experience[idx]
+                    state_vector = self.task.wrap_stateid(state)
+                    states[idx - idx_offset, :] = state_vector.reshape(-1)
+                    actions[idx - idx_offset] = action
+                #q[idx_offset:next_offset] = self.dqn.fprop(states)[np.arange(self.minibatch_size), actions][:next_offset-idx_offset]
+                q[idx_offset:next_offset] = np.max(self.dqn.fprop(states), axis=1)[:next_offset - idx_offset]
+                ## use normalized action values
+                #av = self.dqn.fprop(states)
+                #for idx in range(idx_offset, next_offset):
+                #    log_prob = prob.normalize_log(av[idx - idx_offset, :])
+                #    q[idx] = max(log_prob)
+            return q
+
+        old_q = compute_action_values()
+
+        for idx, sample in enumerate(self.experience):
+            Is[idx] = 0.
+            state, action, next_state, reward = self.experience[idx]
+            log_p[idx] = 0.
+
+            if next_state in self.Idict:
+                log_p[idx] = self.Idict[next_state]
+
+        log_p = prob.normalize_log(log_p * 1e1)
         p = np.exp(log_p)
         print 'prob', p, 'max_prob', max(p)
         indices = prob.choice(range(len(self.experience)), 256, replace=True, p=p)
-        print indices
+        print [self.task.env.state_pos[self.experience[ind][0]] for ind in indices]
+
         painful_samples = prob.choice(self.experience, 256, replace=True, p=p)
         # print [p[ind] for ind in np.argsort(log_p)[-1:-256-1:-1]]
         # painful_samples = [self.experience[ind] for ind in np.argsort(log_p)[-1:-256-1:-1]]
         self.painful_experience.extend(painful_samples)
         if len(self.painful_experience) > 1000:
-            self.painful_experience = self.painful_experience[-1000:]
+           self.painful_experience = self.painful_experience[-1000:]
 
-        for it in range(1 + int(len(self.painful_experience) / self.minibatch_size)):
+        for it in range(100):
             # sample and process minibatch
-            samples = prob.choice(self.painful_experience, self.minibatch_size, replace=True)
+            samples = prob.choice(self.experience, self.minibatch_size, replace=True, p=p)
             terminals = []
             for idx, sample in enumerate(samples):
-                state_vector, action, next_state_vector, reward = sample
+                state, action, next_state, reward = sample
+                state_vector = self.task.wrap_stateid(state)
 
                 states[idx, :] = state_vector.reshape(-1)
                 actions[idx] = action
                 rewards[idx] = reward
 
-                if next_state_vector is not None:
+                if next_state is not None:
+                    next_state_vector = self.task.wrap_stateid(next_state)
                     next_states[idx, :] = next_state_vector.reshape(-1)
                 else:
                     terminals.append(idx)
@@ -382,24 +393,45 @@ class AdaDeepQlearn(object):
 
             self.bprop(states, actions, targets.flatten())
 
-    def _learn(self, next_state_vector, reward):
-        self._add_to_experience(self.last_state_vector, self.last_action,
-                                next_state_vector, reward)
+        new_q = compute_action_values()
+
+        Icount = {}
+        Idict = {}
+        for idx, sample in enumerate(self.experience):
+            state, action, next_state, reward = sample
+            if state not in Icount:
+                Icount[state] = 0
+                Idict[state] = 0.
+            Idict[state] += (new_q[idx] - old_q[idx])
+            Icount[state] += 1
+
+        for state in self.Idict:
+            self.Idict[state] *= 0.8
+
+        for state in Idict:
+            if state not in self.Idict:
+                self.Idict[state] = 0.
+            self.Idict[state] += (Idict[state] / Icount[state]) * 0.2
+
+    def _learn(self, next_state, reward):
+        self._add_to_experience(self.last_state, self.last_action,
+                                next_state, reward)
 
     def _end_episode(self, reward):
-        if self.last_state_vector is not None:
-            self._add_to_experience(self.last_state_vector, self.last_action, None,
+        if self.last_state is not None:
+            self._add_to_experience(self.last_state, self.last_action, None,
                                     reward)
-        self.last_state_vector = None
+        self.last_state = None
         self.last_action = None
 
-    def run(self, num_epochs = 1, budget=10, tol=1e-6):
+    def run(self, num_epochs = 5, budget=10, tol=1e-6):
         task = self.task
 
         total_steps = 0.
+        self.experience = []
         for ei in range(num_epochs):
-            self.experience = []
             for state in task.get_valid_states():
+            #for state in [task.start_state]:
                 task.env.curr_state = task.env.state_pos[state]
                 if task.is_terminal():
                     continue
@@ -418,17 +450,16 @@ class AdaDeepQlearn(object):
 
                         curr_state_vector = task.wrap_stateid(curr_state)
                         action = self.dqn.get_action(curr_state_vector, method='eps-greedy', epsilon=self.epsilon)
-                        self.last_state_vector = curr_state_vector
+                        self.last_state = curr_state
                         self.last_action = action
 
                         next_state, reward = task.perform_action(action)
-                        next_state_vector = task.wrap_stateid(next_state)
 
                         if task.is_terminal():
                             self._end_episode(reward)
                             break
                         else:
-                            self._learn(next_state_vector, reward)
+                            self._learn(next_state, reward)
                             curr_state = next_state
 
                         num_steps += 1
@@ -436,9 +467,9 @@ class AdaDeepQlearn(object):
                     if num_steps >= budget or task.is_terminal():
                         break
 
-            # learn for one pass.
-            print 'experience', len(self.experience)
-            self._update_net()
+        # learn for one pass.
+        print 'experience', len(self.experience)
+        self._update_net()
 
 def compute_tabular_value(task, tol=1e-4):
     solver = ValueIterationSolver(task, tol=tol)
