@@ -208,11 +208,11 @@ class DeepQlearn(object):
         self.last_action = None
 
 
-    def run(self, budget = 100, tol=1e-6):
+    def run(self, num_episodes=100, tol=1e-4):
         task = self.task
 
         total_steps = 0.
-        while True:
+        for ei in range(num_episodes):
             task.reset()
             while task.is_terminal():
                 task.reset()
@@ -245,8 +245,6 @@ class DeepQlearn(object):
                 num_steps += 1
                 total_steps += 1
 
-                if total_steps >= budget:
-                    return
 
 class AdaDeepQlearn(object):
     '''
