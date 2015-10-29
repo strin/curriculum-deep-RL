@@ -358,13 +358,6 @@ class AdaDeepQlearn(object):
         indices = prob.choice(range(len(self.experience)), 256, replace=True, p=p)
         print [self.task.env.state_pos[self.experience[ind][0]] for ind in indices]
 
-        painful_samples = prob.choice(self.experience, 256, replace=True, p=p)
-        # print [p[ind] for ind in np.argsort(log_p)[-1:-256-1:-1]]
-        # painful_samples = [self.experience[ind] for ind in np.argsort(log_p)[-1:-256-1:-1]]
-        self.painful_experience.extend(painful_samples)
-        if len(self.painful_experience) > 1000:
-           self.painful_experience = self.painful_experience[-1000:]
-
         for it in range(100):
             # sample and process minibatch
             samples = prob.choice(self.experience, self.minibatch_size, replace=True, p=p)
@@ -470,6 +463,7 @@ class AdaDeepQlearn(object):
         # learn for one pass.
         print 'experience', len(self.experience)
         self._update_net()
+
 
 def compute_tabular_value(task, tol=1e-4):
     solver = ValueIterationSolver(task, tol=tol)

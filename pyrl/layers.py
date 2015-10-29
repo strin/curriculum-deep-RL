@@ -26,7 +26,7 @@ class FullyConnected(object):
             raise NotImplementedError()
 
         # initialize weight matrix W of size (input_dim, output_dim)
-        std_dev = np.sqrt(2. / input_dim)
+        std_dev = np.sqrt(0.2 / input_dim)
         W_init = std_dev * np.random.randn(input_dim, output_dim)
         W = theano.shared(value=W_init, name='W')
 
