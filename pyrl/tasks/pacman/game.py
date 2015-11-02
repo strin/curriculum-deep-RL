@@ -459,8 +459,8 @@ class GameStateData:
                 agent_array[x, y, :] = self._dirEncoding(agent_dir)
                 agent_array_list.append(agent_array)
         return {
-            'food': np.array(self.food.data, dtype=np.float32),
-            'wall': np.array(self.layout.walls.data, dtype=np.float32),
+            'food': np.array(self.food.data, dtype=float),
+            'wall': np.array(self.layout.walls.data, dtype=float),
             'pacman': pacman_array,
             'ghosts': np.array(agent_array_list)
         }
@@ -581,55 +581,13 @@ class Game:
         sys.stdout = OLD_STDOUT
         sys.stderr = OLD_STDERR
 
-
-    def run( self ):
-        """
-        Main control loop for game play.
-        """
-        self.display.initialize(self.state.data)
-        self.numMoves = 0
-
-        ###self.display.initialize(self.state.makeObservation(1).data)
-        # inform learning agents of the game start
-        for i in range(len(self.agents)):
-            agent = self.agents[i]
-            if not agent:
-                self.mute(i)
-                # this is a null agent, meaning it failed to load
-                # the other team wins
-                print "Agent %d failed to load" % i
-                self.unmute()
-                self._agentCrash(i, quiet=True)
-                return
-            if ("registerInitialState" in dir(agent)):
-                self.mute(i)
-                if self.catchExceptions:
-                    try:
-                        timed_func = TimeoutFunction(agent.registerInitialState, int(self.rules.getMaxStartupTime(i)))
-                        try:
-                            start_time = time.time()
-                            timed_func(self.state.deepCopy())
-                            time_taken = time.time() - start_time
-                            self.totalAgentTimes[i] += time_taken
-                        except TimeoutFunctionException:
-                            print "Agent %d ran out of time on startup!" % i
-                            self.unmute()
-                            self.agentTimeout = True
-                            self._agentCrash(i, quiet=True)
-                            return
-                    except Exception,data:
-                        self._agentCrash(i, quiet=False)
-                        self.unmute()
-                        return
-                else:
-                    agent.registerInitialState(self.state.deepCopy())
-                ## TODO: could this exceed the total time
-                self.unmute()
-
-        agentIndex = self.startingIndex
+    def run_one(self):
         numAgents = len( self.agents )
 
-        while not self.gameOver:
+        for agentIndex in range(self.startingIndex, self.startingIndex + numAgents):
+            if self.gameOver:
+                break
+            agentIndex = agentIndex % numAgents
             # Fetch the next agent
             agent = self.agents[agentIndex]
             move_time = 0
@@ -731,16 +689,47 @@ class Game:
             if _BOINC_ENABLED:
                 boinc.set_fraction_done(self.getProgress())
 
-        # inform a learning agent of the game result
-        for agentIndex, agent in enumerate(self.agents):
-            if "final" in dir( agent ) :
-                try:
-                    self.mute(agentIndex)
-                    agent.final( self.state )
-                    self.unmute()
-                except Exception,data:
-                    if not self.catchExceptions: raise
-                    self._agentCrash(agentIndex)
-                    self.unmute()
-                    return
+
+    def init(self):
+        self.display.initialize(self.state.data)
+        self.numMoves = 0
+
+        ###self.display.initialize(self.state.makeObservation(1).data)
+        # inform learning agents of the game start
+        for i in range(len(self.agents)):
+            agent = self.agents[i]
+            if not agent:
+                self.mute(i)
+                # this is a null agent, meaning it failed to load
+                # the other team wins
+                print "Agent %d failed to load" % i
+                self.unmute()
+                self._agentCrash(i, quiet=True)
+                return
+            if ("registerInitialState" in dir(agent)):
+                self.mute(i)
+                if self.catchExceptions:
+                    try:
+                        timed_func = TimeoutFunction(agent.registerInitialState, int(self.rules.getMaxStartupTime(i)))
+                        try:
+                            start_time = time.time()
+                            timed_func(self.state.deepCopy())
+                            time_taken = time.time() - start_time
+                            self.totalAgentTimes[i] += time_taken
+                        except TimeoutFunctionException:
+                            print "Agent %d ran out of time on startup!" % i
+                            self.unmute()
+                            self.agentTimeout = True
+                            self._agentCrash(i, quiet=True)
+                            return
+                    except Exception,data:
+                        self._agentCrash(i, quiet=False)
+                        self.unmute()
+                        return
+                else:
+                    agent.registerInitialState(self.state.deepCopy())
+                ## TODO: could this exceed the total time
+                self.unmute()
+
+    def finalize(self):
         self.display.finish()

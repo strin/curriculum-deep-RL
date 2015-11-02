@@ -263,6 +263,7 @@ class ClassicGameRules:
     """
     def __init__(self, timeout=30):
         self.timeout = timeout
+        self.quiet = True
 
     def newGame( self, layout, pacmanAgent, ghostAgents, display, quiet = False, catchExceptions=False):
         agents = [pacmanAgent] + ghostAgents[:layout.getNumGhosts()]

@@ -7,7 +7,6 @@ import theano.tensor as T
 import cPickle as pickle
 from theano.printing import pydotprint
 
-from pyrl.tasks.task import Environment
 import pyrl.layers
 import pyrl.optimizers
 import pyrl.prob as prob
@@ -77,12 +76,13 @@ class DQN(Qfunc):
     '''
     A deep Q function that uses theano.
     '''
-    def __init__(self, task, arch_func):
+    def __init__(self, task, arch_func, state_type=T.matrix):
         '''
         epsilon: probability for taking a greedy action.
         '''
         self.arch_func = arch_func
         self.task = task
+        self.state_type = state_type
         self._initialize_net()
 
     def is_tabular(self):
@@ -97,7 +97,7 @@ class DQN(Qfunc):
         Initialize the deep Q neural network.
         '''
         # construct computation graph for forward pass
-        self.states = T.matrix('states')
+        self.states = self.state_type('states')
         self.action_values, model = self.arch_func(self.states)
         self.params = sum([layer.params for layer in model.values()], [])
 
@@ -122,44 +122,44 @@ class DQN(Qfunc):
         state_vector = state_vector.reshape(1, -1)
 
         # uniform distribution.
-        probs = [epsilon / self.task.get_num_actions()] * self.task.get_num_actions()
+        probs = [epsilon / self.task.num_actions] * self.task.num_actions
 
         # increase probability at greedy action..
         action = np.argmax(self.fprop(state_vector))
         probs[action] += 1-epsilon
         return probs
 
-    def _get_eps_greedy_action(self, state_vector, epsilon):
+    def _get_eps_greedy_action(self, state, epsilon):
         # transpose since the DQN expects row vectors
-        state_vector = state_vector.reshape(1, -1)
+        state = state.reshape(1, *state.shape)
 
         # epsilon greedy w.r.t the current policy
         if(random.random() < epsilon):
-            action = np.random.randint(0, self.task.get_num_actions())
+            action = np.random.randint(0, self.task.num_actions)
         else:
             # a^* = argmax_{a} Q(s, a)
-            action = np.argmax(self.fprop(state_vector))
+            action = np.argmax(self.fprop(state))
         return action
 
-    def _get_softmax_action_distribution(self, state_vector, temperature):
-        state_vector = state_vector.reshape(1, -1)
-        qvals = self.fprop(state_vector).reshape(-1)
+    def _get_softmax_action_distribution(self, state, temperature):
+        state = state.reshape(1, *state.shape)
+        qvals = self.fprop(state).reshape(-1)
         qvals = qvals / temperature
         return np.exp(prob.normalize_log(qvals))
 
     def _get_softmax_action(self, state_vector, temperature):
         probs = self._get_softmax_action_distribution(state_vector, temperature)
-        return npr.choice(range(self.task.get_num_actions()), 1, replace=True, p=probs)[0]
+        return npr.choice(range(self.task.num_actions), 1, replace=True, p=probs)[0]
 
-    def get_action(self, state_vector, **kwargs):
+    def get_action(self, state, **kwargs):
         if 'method' in kwargs:
             method = kwargs['method']
             if method == 'eps-greedy':
-                return self._get_eps_greedy_action(state_vector, kwargs['epsilon'])
+                return self._get_eps_greedy_action(state, kwargs['epsilon'])
             elif method == 'softmax':
-                return self._get_softmax_action(state_vector, kwargs['temperature'])
+                return self._get_softmax_action(state, kwargs['temperature'])
         else:
-            return self._get_eps_greedy_action(state_vector, epsilon=0.05)
+            return self._get_eps_greedy_action(state, epsilon=0.05)
 
     def get_action_distribution(self, state_vector, **kwargs):
         if 'method' in kwargs:
@@ -170,7 +170,7 @@ class DQN(Qfunc):
                 log_probs = self._get_softmax_action_distribution(state_vector, kwargs['temperature'])
         else: # default, 0.05-greedy policy.
             log_probs = self._get_eps_greedy_action_distribution(state_vector, epsilon=0.05)
-        return {action: log_probs[action] for action in range(self.task.get_num_actions())}
+        return {action: log_probs[action] for action in range(self.task.num_actions)}
 
 
     def __call__(self, state_vector, action):
