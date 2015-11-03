@@ -2,9 +2,11 @@ import pyrl
 from pyrl.tasks.task import Task
 from util import *
 from pacman import GameState, ClassicGameRules, loadAgent
-from game import Game, Directions, Actions, Agent
+from game import Game, Directions, Actions, Agent, AgentState, Configuration
+from pyrl.tasks.pacman.ghostAgents import DirectionalGhost
 import layout
 import numpy as np
+import cStringIO
 from threading import Thread, Event
 
 class GameWaitAgent(Agent):
@@ -45,6 +47,11 @@ class GameNoWaitAgent(Agent):
     def getAction(self, state):
         return self.next_action
 
+    def deepCopy(self):
+        agent = GameNoWaitAgent()
+        agent.next_action = self.next_action
+        return agent
+
 class PacmanTask(Task):
     def __init__(self, layout, agents, display, state_repr='stack', muteAgents=False, catchExceptions=False):
         '''
@@ -55,6 +62,12 @@ class PacmanTask(Task):
         '''
         # parse state representation.
         self.state_repr = state_repr
+        self.layout = layout
+        self.agents = agents
+        self.display = display
+        self.muteAgents = muteAgents
+        self.catchExceptions = catchExceptions
+
         if self.state_repr.endswith('frames'):
             bar_pos = self.state_repr.rfind('frames')
             self.state_k = int(self.state_repr[:bar_pos-1])
@@ -62,6 +75,13 @@ class PacmanTask(Task):
         self.init_state = GameState()
         self.init_state.initialize(layout, len(agents))
         self.game_rule = ClassicGameRules(timeout=100)
+        self.myagent = GameNoWaitAgent()
+        self.init_game = Game([self.myagent] + agents[:layout.getNumGhosts()],
+                        display,
+                        self.game_rule,
+                        catchExceptions = catchExceptions)
+        self.init_game.state = self.init_state
+
         # action mapping.
         self.all_actions = Actions._directions.keys()
         self.action_to_dir = {action_i: action
@@ -70,18 +90,17 @@ class PacmanTask(Task):
             for (action_i, action) in enumerate(self.all_actions)}
 
         def start_game():
-            self.action_event = Event()
-            self.done_event = Event()
-            self.myagent = GameNoWaitAgent()
-            self.game = Game([self.myagent] + agents[:layout.getNumGhosts()],
-                            display,
-                            self.game_rule,
-                            catchExceptions = catchExceptions)
-            self.game.state = self.init_state
+            self.game = self.init_game.deepCopy()
             self.game.init()
 
         self.start_game = start_game
         start_game()
+
+    def deep_copy(self):
+        task = PacmanTask(self.layout, self.agents, self.display, self.state_repr, self.muteAgents, self.catchExceptions)
+        task.game = self.game.deepCopy()
+        task.myagent = self.myagent # TODO: agents not deep copy.
+        return task
 
     @property
     def curr_state_dict(self):
@@ -136,7 +155,7 @@ class PacmanTask(Task):
                 k += 1
             state = np.array(state)
             frame_dim = state.shape[0] / k
-            for ki in range(k + 1, self.state_k + 1):
+            for ki in range(k, self.state_k + 1):
                 state = np.concatenate((state, np.zeros_like(state[:frame_dim, :, :])), axis=0)
             return state
 
@@ -185,5 +204,134 @@ class PacmanTask(Task):
 
     def __str__(self):
         return str(self.game.state)
+
+
+class GameEditor(object):
+    """
+    provide primitive edit functions to game state data.
+    """
+    @staticmethod
+    def _find_free_pos(data):
+        config = data.array()
+        width, height = data.layout.width, data.layout.height
+        for x in range(width):
+            for y in range(height):
+                if (config['wall'][x, y] == 1 or
+                    config['food'][x, y] == 1 or
+                    any(map(lambda ghost: ghost[x, y].any() == 1, config['ghosts']))):
+                    continue
+                else:
+                    yield (x, y)
+
+    @staticmethod
+    def move_pacman(game):
+        '''
+        move pacman to any free pos on the map.
+        '''
+        data = game.state.data
+        # find pacman.
+        def find_pacman(new_data):
+            pacmanState = None
+            for agentState in new_data.agentStates:
+                if agentState.isPacman:
+                    pacmanState = agentState
+                    break
+            assert(pacmanState)
+            return pacmanState
+
+        # create all valid modifications of pacman.
+        game_nb = []
+        for (x, y) in GameEditor._find_free_pos(data):
+                for dir in Directions.ALL:
+                    new_data = data.deepCopy()
+                    pacmanState = find_pacman(new_data)
+                    pacmanState.configuration.pos = (x, y) # change the state.
+                    pacmanState.configuration.direction = dir
+                    new_game = game.deepCopy()
+                    new_game.state.data = new_data
+                    game_nb.append(new_game)
+        return game_nb
+
+    @staticmethod
+    def del_ghost(game):
+        data = game.state.data
+        game_nb = []
+        if len(data.agentStates) == 1:
+            return game_nb
+        # try to delete one of the ghosts.
+        for ind in range(1, len(data.agentStates)): # TODO: abusing variable naming convention here, CS188 and pyrl use different conventions.
+            if ind == 0:
+                continue
+            new_game = game.deepCopy()
+            rm_ind = lambda xs: [x for (xi, x) in enumerate(xs) if xi != ind]
+            new_game.state.data.agentStates = rm_ind(data.agentStates)
+            new_game.agents = rm_ind(game.agents)
+            new_game.totalAgentTimes = rm_ind(game.totalAgentTimes)
+            new_game.totalAgentTimeWarnings = rm_ind(game.totalAgentTimeWarnings)
+            new_game.agentOutput = rm_ind(game.agentOutput)
+            game_nb.append(new_game)
+        return game_nb
+
+    @staticmethod
+    def add_ghost(game, ghost_type=DirectionalGhost):
+        data = game.state.data
+        game_nb = []
+        for (x, y) in GameEditor._find_free_pos(data):
+            for dir in Directions.ALL:
+                agentState = AgentState(Configuration((x, y), dir), isPacman=False)
+                new_game = game.deepCopy()
+                new_game.state.data.agentStates.append(agentState)
+                new_game.agents.append(ghost_type(len(new_game.agents)))
+                new_game.totalAgentTimes.append(0.)
+                new_game.totalAgentTimeWarnings.append(0.)
+                new_game.agentOutput.append(cStringIO.StringIO())
+                game_nb.append(new_game)
+            break
+        return game_nb
+
+    @staticmethod
+    def move_ghost(game, ghost_index=1):
+        data = game.state.data
+        # create all valid modifications of pacman.
+        game_nb = []
+        for (x, y) in GameEditor._find_free_pos(data):
+                for dir in Directions.ALL:
+                    new_data = data.deepCopy()
+                    ghostState =  data.agentStates[ghost_index]
+                    ghostState.configuration.pos = (x, y) # change the state.
+                    ghostState.configuration.direction = dir
+                    new_game = game.deepCopy()
+                    new_game.state.data = new_data
+                    game_nb.append(new_game)
+        return game_nb
+
+    @staticmethod
+    def move_ghosts(game):
+        game_nb = []
+        for ghost_index in range(1, len(game.agents)):
+            game_nb.extend(GameEditor.move_ghost(game, ghost_index))
+        return game_nb
+
+
+class PacmanTaskShifter(object):
+    """
+    creates local edits to a PacmanTask
+    """
+    @staticmethod
+    def neighbors(task, axis=['move_pacman']):
+        game = task.game
+        game_nb = []
+        for ax in axis:
+            game_nb += getattr(GameEditor, ax)(game)
+        task_nb = []
+        for new_game in game_nb:
+            new_task = task.deep_copy()
+            new_task.init_game = new_game
+            new_task.reset()
+            task_nb.append(new_task)
+        return task_nb
+
+
+
 
 

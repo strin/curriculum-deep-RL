@@ -45,6 +45,8 @@ class Directions:
                    WEST:  SOUTH,
                    STOP:  STOP}
 
+    ALL = [NORTH, SOUTH, EAST, WEST, STOP]
+
     RIGHT =      dict([(y,x) for x, y in LEFT.items()])
 
     REVERSE = {NORTH: SOUTH,
@@ -88,6 +90,9 @@ class Configuration:
     def __str__(self):
         return "(x,y)="+str(self.pos)+", "+str(self.direction)
 
+    def copy(self):
+        return Configuration(self.pos, self.direction)
+
     def generateSuccessor(self, vector):
         """
         Generates a new configuration reached by translating the current
@@ -130,7 +135,7 @@ class AgentState:
 
     def copy( self ):
         state = AgentState( self.start, self.isPacman )
-        state.configuration = self.configuration
+        state.configuration = self.configuration.copy()
         state.scaredTimer = self.scaredTimer
         return state
 
@@ -383,6 +388,7 @@ class GameStateData:
         state._agentMoved = self._agentMoved
         state._foodEaten = self._foodEaten
         state._capsuleEaten = self._capsuleEaten
+        state.agentStates = self.copyAgentStates(self.agentStates)
         return state
 
     def copyAgentStates( self, agentStates ):
@@ -548,6 +554,16 @@ class Game:
         self.agentTimeout = False
         import cStringIO
         self.agentOutput = [cStringIO.StringIO() for agent in agents]
+
+    def deepCopy(self):
+        game = Game(self.agents, self.display, self.rules, self.startingIndex, self.muteAgents, self.catchExceptions)
+        game.state = self.state.deepCopy()
+        game.gameOver = self.gameOver
+        game.moveHistory = self.moveHistory
+        game.totalAgentTimes = list(self.totalAgentTimes)
+        game.totalAgentTimeWarnings = list(self.totalAgentTimeWarnings)
+        game.agentTimeout = self.agentTimeout
+        return game
 
     def getProgress(self):
         if self.gameOver:
@@ -733,3 +749,6 @@ class Game:
 
     def finalize(self):
         self.display.finish()
+
+    def __str__(self):
+        return str(self.state)
