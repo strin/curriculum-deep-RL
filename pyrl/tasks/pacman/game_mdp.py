@@ -53,7 +53,8 @@ class GameNoWaitAgent(Agent):
         return agent
 
 class PacmanTask(Task):
-    def __init__(self, layout, agents, display, state_repr='stack', muteAgents=False, catchExceptions=False):
+    def __init__(self, layout, agents, display, state_repr='stack',
+                 muteAgents=False, catchExceptions=False):
         '''
         state_repr: state representation, possible values ['stack', 'k-frames', 'dict']
             'stack' - stack walls, food, ghost and pacman representation into a 4D tensor.
@@ -97,7 +98,8 @@ class PacmanTask(Task):
         start_game()
 
     def deep_copy(self):
-        task = PacmanTask(self.layout, self.agents, self.display, self.state_repr, self.muteAgents, self.catchExceptions)
+        agents = list(self.agents)
+        task = PacmanTask(self.layout, agents, self.display, self.state_repr, self.muteAgents, self.catchExceptions)
         task.game = self.game.deepCopy()
         task.myagent = self.myagent # TODO: agents not deep copy.
         return task
@@ -112,6 +114,10 @@ class PacmanTask(Task):
             return self.curr_state_dict
         elif self.state_repr == 'stack':
             state_dict = self.curr_state_dict
+            if len(state_dict.get('ghosts')) == 0:
+                ghost_stacked = np.zeros_like(state_dict['pacman'])
+            else:
+                ghost_stacked = np.sum(state_dict['ghosts'], axis=0)
             state = np.array(
                 [
                     state_dict['food'],
@@ -122,14 +128,9 @@ class PacmanTask(Task):
                     state_dict['pacman'][:, :, i] for i in range(4)
                 ]
                 +
-                sum(
-                    [
-                        [
-                            ghost[:, :, i] for i in range(4)
-                        ]
-                        for ghost in state_dict['ghosts']
-                    ], []
-                )
+                [
+                    ghost_stacked[:, :, i] for i in range(4)
+                ]
             )
             return state
         elif hasattr(self, 'state_k'):
@@ -286,6 +287,7 @@ class GameEditor(object):
                 new_game.totalAgentTimeWarnings.append(0.)
                 new_game.agentOutput.append(cStringIO.StringIO())
                 game_nb.append(new_game)
+                break # use one direction.
             break
         return game_nb
 
@@ -331,7 +333,16 @@ class PacmanTaskShifter(object):
             task_nb.append(new_task)
         return task_nb
 
-
-
-
+class PacmanTaskFeature(object):
+    '''
+    build meta-reasoning features for PacmanTask.
+    '''
+    @staticmethod
+    def featurize_num_ghost(task):
+        game = task.game
+        data = game.state.data
+        feat = dict()
+        feat['#ghost'] = len(data.agentStates) - 1.
+        feat['bias'] = 1.
+        return feat
 

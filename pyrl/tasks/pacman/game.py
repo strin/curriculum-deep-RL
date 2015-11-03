@@ -556,7 +556,7 @@ class Game:
         self.agentOutput = [cStringIO.StringIO() for agent in agents]
 
     def deepCopy(self):
-        game = Game(self.agents, self.display, self.rules, self.startingIndex, self.muteAgents, self.catchExceptions)
+        game = Game(list(self.agents), self.display, self.rules, self.startingIndex, self.muteAgents, self.catchExceptions)
         game.state = self.state.deepCopy()
         game.gameOver = self.gameOver
         game.moveHistory = self.moveHistory
