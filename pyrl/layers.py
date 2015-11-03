@@ -1,7 +1,7 @@
 import numpy as np
 import theano
 import theano.tensor as T
-
+from theano.tensor.signal.downsample import max_pool_2d
 
 class FullyConnected(object):
     def __init__(self, input_dim, output_dim, activation='relu'):
@@ -80,7 +80,7 @@ class Conv(object):
             raise NotImplementedError()
 
         # initialize weight matrix W of size (input_dim, output_dim)
-        std_dev = np.sqrt(2. / input_dim)
+        std_dev = np.sqrt(2. / (input_dim * filter_size[0] * filter_size[1]))
         W_init = std_dev * np.random.randn(output_dim, input_dim, filter_size[0], filter_size[1])
         W = theano.shared(value=W_init, name='W')
 
@@ -98,7 +98,7 @@ class Conv(object):
     def __call__(self, inputs):
         # set-up the outputs
         conv_out = T.nnet.conv.conv2d(inputs, self.W) + self.b.dimshuffle('x', 0, 'x', 'x')
-        pool_out = T.signal.downsample.max_pool_2d(input=conv_out, ds=self.pool_size, ignore_border=True)
+        pool_out = max_pool_2d(input=conv_out, ds=self.pool_size, ignore_border=True)
         return pool_out
 
     def get_params(self):

@@ -46,7 +46,19 @@ class GameNoWaitAgent(Agent):
         return self.next_action
 
 class PacmanTask(Task):
-    def __init__(self, layout, agents, display, muteAgents=False, catchExceptions=False):
+    def __init__(self, layout, agents, display, state_repr='stack', muteAgents=False, catchExceptions=False):
+        '''
+        state_repr: state representation, possible values ['stack', 'k-frames', 'dict']
+            'stack' - stack walls, food, ghost and pacman representation into a 4D tensor.
+            'dict' - return the raw dict representation keys=['walls', 'food', 'ghost', 'pacman'], values are matrix/tensor.
+            'k-frames' - instead of directional descriptors for pacman and ghost, use static descriptors and capture past k frames.
+        '''
+        # parse state representation.
+        self.state_repr = state_repr
+        if self.state_repr.endswith('frames'):
+            bar_pos = self.state_repr.rfind('frames')
+            self.state_k = int(self.state_repr[:bar_pos-1])
+            self.state_history = []
         self.init_state = GameState()
         self.init_state.initialize(layout, len(agents))
         self.game_rule = ClassicGameRules(timeout=100)
@@ -77,27 +89,56 @@ class PacmanTask(Task):
 
     @property
     def curr_state(self):
-        state_dict = self.curr_state_dict
-        state = np.array(
-            [
-                state_dict['food'],
-                state_dict['wall']
-            ]
-            +
-            [
-                state_dict['pacman'][:, :, i] for i in range(4)
-            ]
-            +
-            sum(
+        if self.state_repr == 'dict':
+            return self.curr_state_dict
+        elif self.state_repr == 'stack':
+            state_dict = self.curr_state_dict
+            state = np.array(
                 [
+                    state_dict['food'],
+                    state_dict['wall']
+                ]
+                +
+                [
+                    state_dict['pacman'][:, :, i] for i in range(4)
+                ]
+                +
+                sum(
                     [
-                        ghost[:, :, i] for i in range(4)
-                    ]
-                    for ghost in state_dict['ghosts']
-                ], []
+                        [
+                            ghost[:, :, i] for i in range(4)
+                        ]
+                        for ghost in state_dict['ghosts']
+                    ], []
+                )
             )
-        )
-        return state
+            return state
+        elif hasattr(self, 'state_k'):
+            state_history = self.state_history + [self.curr_state_dict]
+            def stack_direction(state_agent):
+                return np.sum(state_agent, axis=2)
+            state = []
+            k = 0
+            for hist_dict in state_history[::-1]:
+                state.extend([
+                        hist_dict['food'],
+                        hist_dict['wall'],
+                        stack_direction(hist_dict['pacman'])
+
+                    ]
+                        +
+                    sum(
+                        [
+                                [stack_direction(ghost) for ghost in hist_dict['ghosts']]
+                        ], []
+                    )
+                )
+                k += 1
+            state = np.array(state)
+            frame_dim = state.shape[0] / k
+            for ki in range(k + 1, self.state_k + 1):
+                state = np.concatenate((state, np.zeros_like(state[:frame_dim, :, :])), axis=0)
+            return state
 
     def is_end(self):
         return self.game.gameOver
@@ -112,16 +153,27 @@ class PacmanTask(Task):
         return [self.dir_to_action[dir] for dir in dirs]
 
     def step(self, action):
+        if hasattr(self, 'state_k'): # if we use past frames.
+            self.state_history.append(self.curr_state_dict)
+            if len(self.state_history) > self.state_k:
+                self.state_history = self.state_history[-self.state_k:]
+
         if action not in self.valid_actions: # TODO: hack.
             action = self.dir_to_action[Directions.STOP]
+
+        # convert action to direction.
         direction = self.action_to_dir[action]
         old_score = self.game.state.data.score
+
+        # run the game using the direction.
         self.myagent.next_action = direction
         self.game.run_one()
         new_score = self.game.state.data.score
         reward = new_score - old_score
+
         if self.is_end():
             self.game.finalize()
+
         return reward
 
     def reset(self):
