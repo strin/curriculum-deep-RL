@@ -222,7 +222,7 @@ class DeepQlearn(object):
                     self._end_episode(0)
                     break
 
-                action = self.dqn.get_action(curr_state, method='eps-greedy', epsilon=self.epsilon)
+                action = self.dqn.get_action(curr_state, method='eps-greedy', epsilon=self.epsilon, valid_actions=task.valid_actions)
                 self.last_state = curr_state
                 self.last_action = action
 

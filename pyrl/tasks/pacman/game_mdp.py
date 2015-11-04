@@ -321,6 +321,7 @@ class PacmanTaskShifter(object):
     """
     @staticmethod
     def neighbors(task, axis=['move_pacman']):
+        task.reset()
         game = task.game
         game_nb = []
         for ax in axis:
@@ -345,4 +346,3 @@ class PacmanTaskFeature(object):
         feat['#ghost'] = len(data.agentStates) - 1.
         feat['bias'] = 1.
         return feat
-

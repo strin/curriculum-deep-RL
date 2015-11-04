@@ -444,7 +444,7 @@ class GameStateData:
         for x, y in self.capsules:
             map[x][y] = 'o'
 
-        return str(map) + ("\nScore: %d\n" % self.score)
+        return str(map) + ("\nScore: %0.2f\n" % self.score)
 
     def array(self):
         """
@@ -596,6 +596,10 @@ class Game:
         # Revert stdout/stderr to originals
         sys.stdout = OLD_STDOUT
         sys.stderr = OLD_STDERR
+
+    def run(self):
+        while not self.gameOver:
+            self.run_one()
 
     def run_one(self):
         numAgents = len( self.agents )

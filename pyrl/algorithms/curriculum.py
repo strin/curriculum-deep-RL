@@ -12,6 +12,7 @@ from pyrl.utils import Timer
 from pyrl.tasks.task import Task
 from pyrl.agents.agent import DQN
 from pyrl.agents.agent import TabularVfunc
+from pyrl.evaluate import reward_stochastic
 
 class MetaModelTabular(object):
     def __init__(self, bonus=1., decay=0.9):
@@ -25,7 +26,6 @@ class MetaModelTabular(object):
             self.model[feat] = self.bonus
         self.model[feat] *= self.decay
         self.model[feat] += val * (1- self.decay)
-        print 'val', val
 
     def get(self, feat):
         feat = json.dumps(feat)
@@ -263,6 +263,211 @@ class DQCL_LocalEdit(object):
                 action = self.dqn.get_action(curr_state, method='eps-greedy', epsilon=self.epsilon)
                 self.last_state = curr_state
                 self.last_action = action
+
+                reward = task.step(action)
+                next_state = task.curr_state
+
+                if task.is_end():
+                    self._end_episode(reward, **tags)
+                    break
+                else:
+                    self._learn(next_state, reward, **tags)
+                    curr_state = next_state
+
+                num_steps += 1
+                total_steps += 1
+
+class DQCL_Rollout_Policy(object):
+    @staticmethod
+    def del_agent_policy(task):
+        if len(task.game.agents) == 1:
+            return None
+        else:
+            from pyrl.tasks.pacman.game_mdp import PacmanTaskShifter
+            return PacmanTaskShifter.neighbors(task, ['del_ghost'])[0]
+
+class DQCL_Rollout(object):
+    '''
+    DQCL = DeepQCurriculumLearning.
+    The agent samples a rollout of tasks, and construct a curriculum.
+    '''
+    def __init__(self, dqn, feat_func, meta_model, meta_policy, gamma=0.95, l2_reg=0.0, lr=1e-3,
+               memory_size=250, minibatch_size=64, epsilon=0.05):
+        '''
+        (TODO): task should be task info.
+        we don't use all of task properties/methods here.
+        only gamma and state dimension.
+        and we allow task switching.
+        '''
+        self.dqn = dqn
+        self.feat_func = feat_func
+        self.meta_policy = meta_policy
+        self.meta_model = meta_model
+        self.l2_reg = l2_reg
+        self.lr = lr
+        self.epsilon = epsilon
+        self.memory_size = memory_size
+        self.minibatch_size = minibatch_size
+        self.gamma = gamma
+
+        # for now, keep experience as a list of tuples
+        self.experience = []
+        # add tags to each experience example.
+        # for example, one tag could be {'task': task} to keep track of which task
+        # the experience came from.
+        self.experience_tags = []
+        self.exp_idx = 0
+
+        # used for streaming updates
+        self.last_state = None
+        self.last_action = None
+
+        # compile back-propagtion network
+        self._compile_bp()
+
+    def _compile_bp(self):
+        states = self.dqn.states
+        action_values = self.dqn.action_values
+        params = self.dqn.params
+        targets = T.vector('target')
+        last_actions = T.lvector('action')
+
+        # loss function.
+        mse = layers.MSE(action_values[T.arange(action_values.shape[0]),
+                            last_actions], targets)
+        # l2 penalty.
+        l2_penalty = 0.
+        for param in params:
+            l2_penalty += (param ** 2).sum()
+
+        cost = mse + self.l2_reg * l2_penalty
+
+        # back propagation.
+        updates = optimizers.Adam(cost, params, alpha=self.lr)
+
+        td_errors = T.sqrt(mse)
+        self.bprop = theano.function(inputs=[states, last_actions, targets],
+                                     outputs=td_errors, updates=updates)
+
+    def _add_to_experience(self, s, a, ns, r, **tags):
+        # TODO: improve experience replay mechanism by making it harder to
+        # evict experiences with high td_error, for example
+        # s, ns are state_vectors.
+        if len(self.experience) < self.memory_size:
+            self.experience.append((s, a, ns, r))
+            self.experience_tags.append(tags)
+        else:
+            self.experience[self.exp_idx] = (s, a, ns, r)
+            self.experience_tags[self.exp_idx] = tags
+            self.exp_idx += 1
+            if self.exp_idx >= self.memory_size:
+                self.exp_idx = 0
+
+    def _update_net(self):
+        '''
+            sample from the memory dataset and perform gradient descent on
+            (target - Q(s, a))^2
+        '''
+        # don't update the network until sufficient experience has been
+        # accumulated
+        if len(self.experience) < self.memory_size:
+            return
+
+        states = [None] * self.minibatch_size
+        next_states = [None] * self.minibatch_size
+        actions = np.zeros(self.minibatch_size, dtype=int)
+        rewards = np.zeros(self.minibatch_size)
+
+        # sample and process minibatch
+        samples = random.sample(self.experience, self.minibatch_size)
+        terminals = []
+        for idx, sample in enumerate(samples):
+            state, action, next_state, reward = sample
+
+            states[idx] = state
+            actions[idx] = action
+            rewards[idx] = reward
+
+            if next_state is not None:
+                next_states[idx] = next_state
+            else:
+                next_states[idx] = state
+                terminals.append(idx)
+
+        # convert states into tensor.
+        states = np.array(states)
+        next_states = np.array(next_states)
+
+        # compute target reward + \gamma max_{a'} Q(ns, a')
+        next_qvals = np.max(self.dqn.fprop(next_states), axis=1)
+
+        # Ensure target = reward when NEXT_STATE is terminal
+        next_qvals[terminals] = 0.
+
+        targets = rewards + self.gamma * next_qvals
+
+        self.bprop(states, actions, targets.flatten())
+
+    def _learn(self, next_state, reward, **tags):
+        self._add_to_experience(self.last_state, self.last_action,
+                                next_state, reward, **tags)
+        self._update_net()
+
+    def _end_episode(self, reward, **tags):
+        if self.last_state is not None:
+            self._add_to_experience(self.last_state, self.last_action, None,
+                                    reward, **tags)
+        self.last_state = None
+        self.last_action = None
+
+    def run(self, task, num_epochs=10, num_episodes=100, tol=1e-4):
+        for ei in range(num_epochs):
+            print 'epoch', ei
+            # construct rollout.
+            next_task = task
+            rollout = []
+            while next_task:
+                rollout.append(next_task)
+                next_task = self.meta_policy(next_task)
+
+            # run DQN on task for #episodes.
+            for t in rollout[::-1]:
+                reward_before = reward_stochastic(self.dqn, t, self.gamma, num_trials=10)
+                self.run_task(t, num_episodes=num_episodes, tol=tol)
+                reward_after = reward_stochastic(self.dqn, t, self.gamma, num_trials=10)
+                improvement = reward_after - reward_before
+                feat = self.feat_func(t)
+                self.meta_model.learn(feat, improvement)
+                print t
+                print 'reward_before', reward_before
+                print 'reward_after', reward_after
+                print feat, self.meta_model.get(feat)
+                print
+
+    def run_task(self, task, num_episodes=100, tol=1e-4):
+        tags = {
+            'task': task
+        }
+        total_steps = 0.
+        for ei in range(num_episodes):
+            task.reset()
+
+            curr_state = task.curr_state
+
+            num_steps = 0.
+            while True:
+                # TODO: Hack!
+                if num_steps >= np.log(tol) / np.log(self.gamma):
+                    # print 'Lying and tell the agent the episode is over!'
+                    self._end_episode(0, **tags)
+                    break
+
+                action = self.dqn.get_action(curr_state, method='eps-greedy', epsilon=self.epsilon, valid_actions=task.valid_actions)
+                self.last_state = curr_state
+                self.last_action = action
+                #print 'num_steps', num_steps
+                #print task.action_to_dir[action]
+                #print task
 
                 reward = task.step(action)
                 next_state = task.curr_state

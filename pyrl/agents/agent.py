@@ -129,16 +129,17 @@ class DQN(Qfunc):
         probs[action] += 1-epsilon
         return probs
 
-    def _get_eps_greedy_action(self, state, epsilon):
+    def _get_eps_greedy_action(self, state, epsilon, valid_actions):
         # transpose since the DQN expects row vectors
         state = state.reshape(1, *state.shape)
 
         # epsilon greedy w.r.t the current policy
         if(random.random() < epsilon):
-            action = np.random.randint(0, self.task.num_actions)
+            action = npr.choice(valid_actions, 1)[0]
         else:
             # a^* = argmax_{a} Q(s, a)
-            action = np.argmax(self.fprop(state))
+            resp = self.fprop(state)[0]
+            action = np.argmax([resp[a] for a in valid_actions])
         return action
 
     def _get_softmax_action_distribution(self, state, temperature):
@@ -147,19 +148,23 @@ class DQN(Qfunc):
         qvals = qvals / temperature
         return np.exp(prob.normalize_log(qvals))
 
-    def _get_softmax_action(self, state_vector, temperature):
+    def _get_softmax_action(self, state_vector, temperature, valid_actions):
         probs = self._get_softmax_action_distribution(state_vector, temperature)
-        return npr.choice(range(self.task.num_actions), 1, replace=True, p=probs)[0]
+        return npr.choice(valid_actions, 1, replace=True, p=probs)[0]
 
     def get_action(self, state, **kwargs):
+        if 'valid_actions' in kwargs:
+            valid_actions = kwargs['valid_actions']
+        else:
+            valid_actions = range(self.task.num_actions) # do not have a valid actions constraints.
         if 'method' in kwargs:
             method = kwargs['method']
             if method == 'eps-greedy':
-                return self._get_eps_greedy_action(state, kwargs['epsilon'])
+                return self._get_eps_greedy_action(state, kwargs['epsilon'], valid_actions=valid_actions)
             elif method == 'softmax':
-                return self._get_softmax_action(state, kwargs['temperature'])
+                return self._get_softmax_action(state, kwargs['temperature'], valid_actions=valid_actions)
         else:
-            return self._get_eps_greedy_action(state, epsilon=0.05)
+            return self._get_eps_greedy_action(state, epsilon=0.05, valid_actions=valid_actions)
 
     def get_action_distribution(self, state_vector, **kwargs):
         if 'method' in kwargs:
