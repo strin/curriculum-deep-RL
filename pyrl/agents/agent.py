@@ -75,6 +75,7 @@ class Qfunc(object):
 class DQN(Qfunc):
     '''
     A deep Q function that uses theano.
+    TODO: dependence on task is only on task.num_actions.
     '''
     def __init__(self, task, arch_func, state_type=T.matrix):
         '''
