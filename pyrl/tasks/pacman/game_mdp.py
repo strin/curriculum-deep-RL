@@ -251,6 +251,7 @@ class GameEditor(object):
                     new_game = game.deepCopy()
                     new_game.state.data = new_data
                     game_nb.append(new_game)
+                    break
         return game_nb
 
     @staticmethod

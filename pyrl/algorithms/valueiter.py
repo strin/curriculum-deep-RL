@@ -83,6 +83,7 @@ class ValueIterationSolver(object):
                 break
 
 
+
 class DeepQlearn(object):
     '''
     DeepMind's deep Q learning algorithms.
@@ -166,7 +167,8 @@ class DeepQlearn(object):
         rewards = np.zeros(self.minibatch_size)
 
         # sample and process minibatch
-        samples = random.sample(self.experience, self.minibatch_size)
+        # samples = random.sample(self.experience, self.minibatch_size) # draw without replacement.
+        samples = prob.choice(self.experience, self.minibatch_size, replace=True) # draw with replacement.
         terminals = []
         for idx, sample in enumerate(samples):
             state, action, next_state, reward = sample
@@ -238,6 +240,7 @@ class DeepQlearn(object):
 
                 num_steps += 1
                 total_steps += 1
+        task.reset()
 
 def compute_tabular_value(task, tol=1e-4):
     solver = ValueIterationSolver(task, tol=tol)

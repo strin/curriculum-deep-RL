@@ -3,18 +3,32 @@ import numpy.random as npr
 from pyrl.tasks.task import Task
 from pyrl.algorithms.valueiter import compute_tabular_value
 
-def reward_stochastic(policy, task, gamma=0.95, num_trials = 100, tol=1e-6):
-    total_reward = 0.
+def reward_stochastic_samples(policy, task, gamma=0.95, num_trials = 100, tol=1e-6, **args):
+    total_reward = []
+
     for ni in range(num_trials):
         num_steps = 0
         task.reset()
+        reward = 0.
         while num_steps < np.log(tol) / np.log(gamma):
+            if task.is_end():
+                break
             curr_state = task.curr_state
-            action = policy.get_action(curr_state, method='eps-greedy', epsilon=0.)
-            reward = task.step(action)
-            total_reward += reward
+            # action = policy.get_action(curr_state, method='eps-greedy', epsilon=0., valid_actions=task.valid_actions)
+            action = policy.get_action(curr_state, valid_actions=task.valid_actions, **args)
+            reward += task.step(action)
             num_steps += 1
-    return total_reward / num_trials
+        total_reward.append(reward)
+    task.reset()
+    return total_reward
+
+def reward_stochastic(policy, task, gamma=0.95, num_trials=100, tol=1e-6, **args):
+    total_reward = reward_stochastic_samples(policy, task, gamma, num_trials, tol, **args)
+    return np.mean(total_reward)
+
+def reward_stochastic_mean_std(policy, task, gamma=0.05, num_trials=100, tol=1e-6, **args):
+    total_reward = reward_stochastic_samples(policy, task, gamma, num_trials, tol, **args)
+    return (np.mean(total_reward), np.std(total_reward))
 
 def reward_tabular(policy, task, tol=1e-4):
     '''
