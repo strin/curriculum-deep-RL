@@ -107,6 +107,7 @@ class DeepQlearn(object):
         # for now, keep experience as a list of tuples
         self.experience = []
         self.exp_idx = 0
+        self.total_exp = 0
 
         # used for streaming updates
         self.last_state = None
@@ -143,6 +144,7 @@ class DeepQlearn(object):
         # TODO: improve experience replay mechanism by making it harder to
         # evict experiences with high td_error, for example
         # s, ns are state_vectors.
+        self.total_exp += 1
         if len(self.experience) < self.memory_size:
             self.experience.append((s, a, ns, r))
         else:
@@ -209,7 +211,13 @@ class DeepQlearn(object):
         self.last_state = None
         self.last_action = None
 
-    def run(self, task, num_episodes=100, tol=1e-4):
+    def run(self, task, num_episodes=100, tol=1e-4, budget=None):
+        '''
+        task: the task to run on.
+        num_episodes: how many episodes to repeat at maximum.
+        tol: tolerance in terms of reward signal.
+        budget: how many total steps to take.
+        '''
         total_steps = 0.
         for ei in range(num_episodes):
             task.reset()
@@ -231,6 +239,9 @@ class DeepQlearn(object):
                 reward = task.step(action)
                 next_state = task.curr_state
 
+                num_steps += 1
+                total_steps += 1
+
                 if task.is_end():
                     self._end_episode(reward)
                     break
@@ -238,8 +249,8 @@ class DeepQlearn(object):
                     self._learn(next_state, reward)
                     curr_state = next_state
 
-                num_steps += 1
-                total_steps += 1
+                if budget and num_steps >= budget:
+                    break
         task.reset()
 
 def compute_tabular_value(task, tol=1e-4):
