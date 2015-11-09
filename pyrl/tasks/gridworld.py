@@ -147,3 +147,6 @@ class GridWorldFixedStart(GridWorld):
         self.curr_pos = self.start_pos
         self.state_2d[self.curr_pos] = 1.
 
+    def __repr__(self):
+        return str(self.start_pos)
+

@@ -13,8 +13,6 @@ from pyrl.agents.agent import eval_policy_reward
 from pyrl.evaluate import eval_dataset, expected_reward_tabular_normalized
 import pyrl.prob as prob
 
-
-
 class SingleLearnerSequential(object):
     def __init__(self, dqn, tasks, **kwargs):
         self.dqn = dqn
