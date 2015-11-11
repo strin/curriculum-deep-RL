@@ -140,7 +140,8 @@ class DQN(Qfunc):
         else:
             # a^* = argmax_{a} Q(s, a)
             resp = self.fprop(state)[0]
-            action = np.argmax([resp[a] for a in valid_actions])
+            action_i = np.argmax([resp[a] for a in valid_actions])
+            action = valid_actions[action_i]
         return action
 
     def _get_softmax_action_distribution(self, state, temperature, valid_actions=None):
@@ -149,7 +150,8 @@ class DQN(Qfunc):
         state = state.reshape(1, *state.shape)
         qvals = self.fprop(state).reshape(-1)[valid_actions]
         qvals = qvals / temperature
-        return np.exp(prob.normalize_log(qvals))
+        p = np.exp(prob.normalize_log(qvals))
+        return p
 
     def _get_softmax_action(self, state_vector, temperature, valid_actions):
         probs = self._get_softmax_action_distribution(state_vector, temperature, valid_actions)

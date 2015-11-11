@@ -197,6 +197,9 @@ class DeepQlearn(object):
 
         targets = rewards + self.gamma * next_qvals
 
+        ## diagnostics.
+        #print 'targets', targets
+        #print 'prop', self.dqn.fprop(states)[range(states.shape[0]), actions]
         self.bprop(states, actions, targets.flatten())
 
     def _learn(self, next_state, reward):
