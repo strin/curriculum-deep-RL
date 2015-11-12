@@ -10,13 +10,15 @@ def reward_stochastic_samples(policy, task, gamma=0.95, num_trials = 100, tol=1e
         num_steps = 0
         task.reset()
         reward = 0.
+        factor = 1.
         while num_steps < np.log(tol) / np.log(gamma):
             if task.is_end():
                 break
             curr_state = task.curr_state
             # action = policy.get_action(curr_state, method='eps-greedy', epsilon=0., valid_actions=task.valid_actions)
             action = policy.get_action(curr_state, valid_actions=task.valid_actions, **args)
-            reward += task.step(action)
+            reward += factor * task.step(action)
+            factor *= gamma
             num_steps += 1
         total_reward.append(reward)
     task.reset()

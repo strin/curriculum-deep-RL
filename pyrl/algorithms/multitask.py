@@ -6,12 +6,12 @@ import numpy as np
 import numpy.random as npr
 import numpy.linalg as npla
 
-import pyrl.optimizers
-import pyrl.layers
+import pyrl.optimizers as optimizers
+import pyrl.layers as layers
+import pyrl.prob as prob
 from pyrl.algorithms.valueiter import DeepQlearn
 from pyrl.agents.agent import eval_policy_reward
 from pyrl.evaluate import eval_dataset, expected_reward_tabular_normalized
-import pyrl.prob as prob
 
 class SingleLearnerSequential(object):
     def __init__(self, dqn, tasks, **kwargs):
@@ -234,13 +234,6 @@ class SingleLearnerGPt(object):
             self.last_task = task
             self.last_task_ti = self.tasks.index(task)
 
-
-
-
-
-
-
-
 class HordeLearnSequential(object):
     def __init__(self, horde_dqn, **kwargs):
         self.tasks = horde_dqn.tasks
@@ -254,4 +247,205 @@ class HordeLearnSequential(object):
             learner = self.deepQlearns[ti]
             learner.run(num_episodes)
 
+class DeepQlearnMT(object):
+    '''
+    A multi-task version of DeepMind's Deep Q Learning Algorithm
+    In this version, each task has a seperate experience buffer, and
+    backpropagation is based on experiences sampled from all buffers.
+    '''
+    def __init__(self, dqn_mt, gamma=0.95, l2_reg=0.0, lr=1e-3,
+               memory_size=250, minibatch_size=64, epsilon=0.05):
+        '''
+        (TODO): task should be task info.
+        we don't use all of task properties/methods here.
+        only gamma and state dimension.
+        and we allow task switching.
+        '''
+        self.dqn = dqn_mt
+        self.l2_reg = l2_reg
+        self.lr = lr
+        self.epsilon = epsilon
+        self.memory_size = memory_size
+        self.minibatch_size = minibatch_size
+        self.gamma = gamma
+
+        # for now, keep experience as a list of tuples
+        self.ex_task = {}
+        self.total_exp_by_task = {}
+        self.ex_id = {}
+        self.total_exp = 0
+
+        # used for streaming updates
+        self.last_state = None
+        self.last_action = None
+
+        # compile back-propagtion network
+        self._compile_bp()
+
+    def _compile_bp(self):
+        states = self.dqn.states
+        action_values = self.dqn.action_values
+        params = self.dqn.params
+        targets = T.vector('target')
+        last_actions = T.lvector('action')
+
+        # loss function.
+        mse = layers.MSE(action_values[T.arange(action_values.shape[0]),
+                            last_actions], targets)
+        # l2 penalty.
+        l2_penalty = 0.
+        for param in params:
+            l2_penalty += (param ** 2).sum()
+
+        cost = mse + self.l2_reg * l2_penalty
+
+        # back propagation.
+        updates = optimizers.Adam(cost, params, alpha=self.lr)
+
+        td_errors = T.sqrt(mse)
+        self.bprop = theano.function(inputs=[states, last_actions, targets],
+                                     outputs=td_errors, updates=updates)
+
+    def _add_to_experience(self, task, s, a, ns, r, nva):
+        # TODO: improve experience replay mechanism by making it harder to
+        # evict experiences with high td_error, for example
+        # s, ns are state_vectors.
+        # nva is a list of valid_actions at the next state.
+        if task not in self.ex_task:
+            self.ex_task[task] = []
+            self.ex_id[task] = 0
+            self.total_exp_by_task[task] = 0
+        self.total_exp += 1
+        self.total_exp_by_task[task] += 1
+        experience = self.ex_task[task]
+        if len(experience) < self.memory_size:
+            experience.append((s, a, ns, r, nva))
+        else:
+            experience[self.ex_id[task]] = (s, a, ns, r, nva)
+            self.ex_id[task] += 1
+            if self.ex_id[task] >= self.memory_size:
+                self.ex_id[task] = 0
+
+    def _update_net(self, task):
+        '''
+            sample from the memory dataset and perform gradient descent on
+            (target - Q(s, a))^2
+        '''
+        if self.total_exp_by_task[task] < self.memory_size:
+            return
+
+        # merge experience buffer.
+        experience = []
+        for task in self.ex_task:
+            experience.extend(self.ex_task[task])
+
+        # do one pass.
+        for it in range(len(self.ex_task)):
+            # don't update the network until sufficient experience has been
+            # accumulated
+            states = [None] * self.minibatch_size
+            next_states = [None] * self.minibatch_size
+            actions = np.zeros(self.minibatch_size, dtype=int)
+            rewards = np.zeros(self.minibatch_size)
+            nvas = []
+
+            # sample and process minibatch
+            # samples = random.sample(self.experience, self.minibatch_size) # draw without replacement.
+            samples = prob.choice(experience, self.minibatch_size, replace=True) # draw with replacement.
+            terminals = []
+
+            for idx, sample in enumerate(samples):
+                state, action, next_state, reward, nva = sample
+
+                states[idx] = state
+                actions[idx] = action
+                rewards[idx] = reward
+                nvas.append(nva)
+
+                if next_state is not None:
+                    next_states[idx] = next_state
+                else:
+                    next_states[idx] = state
+                    terminals.append(idx)
+
+            # convert states into tensor.
+            states = np.array(states)
+            next_states = np.array(next_states)
+
+            # compute target reward + \gamma max_{a'} Q(ns, a')
+            # Ensure target = reward when NEXT_STATE is terminal
+            next_qvals = self.dqn.fprop(next_states)
+            next_vs = np.zeros(self.minibatch_size)
+            for idx in range(self.minibatch_size):
+                if idx not in terminals:
+                    next_vs[idx] = np.max(next_qvals[idx, nvas[idx]])
+
+            targets = rewards + self.gamma * next_vs
+
+            ## diagnostics.
+            #print 'targets', targets
+            #print 'next_qvals', next_qvals
+            #print 'pure prop', self.dqn.fprop(states)
+            #print 'prop', self.dqn.fprop(states)[range(states.shape[0]), actions]
+            #print 'actions', actions
+            #for it in range(10):
+            error = self.bprop(states, actions, targets.flatten())
+            #    print 'error', error
+
+    def _learn(self, task, next_state, reward, next_valid_actions):
+        '''
+        need next_valid_actions to compute appropriate V = max_a Q(s', a).
+        '''
+        self._add_to_experience(task, self.last_state, self.last_action,
+                                next_state, reward, next_valid_actions)
+        self._update_net(task)
+
+    def _end_episode(self, task, reward):
+        if self.last_state is not None:
+            self._add_to_experience(task, self.last_state, self.last_action, None,
+                                    reward, [])
+        self.last_state = None
+        self.last_action = None
+
+    def run(self, task, num_episodes=100, tol=1e-4, budget=None):
+        '''
+        task: the task to run on.
+        num_episodes: how many episodes to repeat at maximum.
+        tol: tolerance in terms of reward signal.
+        budget: how many total steps to take.
+        '''
+        total_steps = 0.
+        for ei in range(num_episodes):
+            task.reset()
+
+            curr_state = task.curr_state
+
+            num_steps = 0.
+            while True:
+                # TODO: Hack!
+                if num_steps >= np.log(tol) / np.log(self.gamma):
+                    # print 'Lying and tell the agent the episode is over!'
+                    self._end_episode(task, 0)
+                    break
+
+                action = self.dqn.get_action(curr_state, method='eps-greedy', epsilon=self.epsilon, valid_actions=task.valid_actions)
+                self.last_state = curr_state
+                self.last_action = action
+
+                reward = task.step(action)
+                next_state = task.curr_state
+
+                num_steps += 1
+                total_steps += 1
+
+                if task.is_end():
+                    self._end_episode(task, reward)
+                    break
+                else:
+                    self._learn(task, next_state, reward, task.valid_actions)
+                    curr_state = next_state
+
+                if budget and num_steps >= budget:
+                    break
+        task.reset()
 
