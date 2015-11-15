@@ -210,7 +210,7 @@ class DeepQlearn(object):
         #print 'actions', actions
         #for it in range(10):
         error = self.bprop(states, actions, targets.flatten())
-        #    print 'error', error
+        #print 'error', error
 
     def _learn(self, next_state, reward, next_valid_actions):
         '''

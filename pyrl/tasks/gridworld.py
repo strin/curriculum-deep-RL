@@ -40,10 +40,10 @@ class GridWorld(Task):
 
         # state representation.
         (h, w) = self.grid.shape
-        self.state_2d = np.zeros((2 * h, w))
-        self.state_2d[self.curr_pos] = 1.
+        self.state_3d = np.zeros((2, h, w))
+        self.state_3d[0, self.curr_pos[0], self.curr_pos[1]] = 1.
         for pos in self.goal:
-            self.state_2d[h + pos[0], pos[1]] = 1.
+            self.state_3d[1, pos[0], pos[1]] = 1.
 
         # start the game fresh.
         self.reset()
@@ -65,16 +65,17 @@ class GridWorld(Task):
 
     def reset(self):
         self.hit_wall = False
-        self.state_2d[self.curr_pos] = 0.
+        self.state_3d[0, self.curr_pos[0], self.curr_pos[1]] = 0.
         self.curr_pos = random.choice(self.free_pos)
-        self.state_2d[self.curr_pos] = 1.
+        self.state_3d[0, self.curr_pos[0], self.curr_pos[1]] = 1.
 
     @property
     def curr_state(self):
         '''
         state is a 1x2HxW tensor.
+        should deep copy the state as it will go into the experience buffer.
         '''
-        return np.array([self.state_2d])
+        return np.array(self.state_3d)
 
     @property
     def num_states(self):
@@ -83,7 +84,7 @@ class GridWorld(Task):
 
     @property
     def state_shape(self):
-        return self.state_2d.shape
+        return self.state_3d.shape
 
     @property
     def shape(self):
@@ -105,8 +106,8 @@ class GridWorld(Task):
             or state[1] >= self.grid.shape[1] or self.grid[state[0], state[1]]
 
     def step(self, action):
-        # update state_2d matrix
-        self.state_2d[self.curr_pos] = 0.
+        # update state_3d matrix
+        self.state_3d[0, self.curr_pos[0], self.curr_pos[1]] = 0.
 
         # compute new coordinate.
         if random.random() < self.action_stoch:
@@ -119,8 +120,8 @@ class GridWorld(Task):
             self.hit_wall = False
             self.curr_pos = tmp
 
-        # update state_2d matrix.
-        self.state_2d[self.curr_pos] = 1.
+        # update state_3d matrix.
+        self.state_3d[0, self.curr_pos[0], self.curr_pos[1]] = 1.
 
         # return reward.
         if self.curr_pos not in self.rewards:
@@ -143,10 +144,10 @@ class GridWorldFixedStart(GridWorld):
 
     def reset(self):
         self.hit_wall = False
-        self.state_2d[self.curr_pos] = 0.
+        self.state_3d[0, self.curr_pos[0], self.curr_pos[1]] = 0.
         self.curr_pos = self.start_pos
-        self.state_2d[self.curr_pos] = 1.
+        self.state_3d[0, self.curr_pos[0], self.curr_pos[1]] = 1.
 
     def __repr__(self):
-        return str(self.start_pos)
+        return str(self.start_pos) + ' -> ' + ','.join([str(key) for key in self.goal.keys()])
 

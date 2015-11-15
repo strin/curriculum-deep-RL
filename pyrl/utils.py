@@ -1,6 +1,7 @@
 import numpy.random as npr
 import numpy as np
 import time
+import os
 
 def make_minibatch_x(data, batch_size, num_iter):
     '''
@@ -45,6 +46,10 @@ def train_test_split(dataset, training_ratio = 0.6):
     train_set = [dataset[ind] for ind in indices]
     test_set = [dataset[ind] for ind in range(len(dataset)) if ind not in indices]
     return (train_set, test_set)
+
+def mkdir_if_not_exist(path):
+    if not os.path.exists(path):
+        os.makedirs(path)
 
 class Timer(object):
     def __init__(self, name=None):

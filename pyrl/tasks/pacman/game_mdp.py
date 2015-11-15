@@ -206,6 +206,9 @@ class PacmanTask(Task):
     def __str__(self):
         return str(self.game.state)
 
+    def __repr__(self):
+        return str(self.game.state)
+
 
 class GameEditor(object):
     """
@@ -224,28 +227,30 @@ class GameEditor(object):
                 else:
                     yield (x, y)
 
+    # find pacman.
+    @staticmethod
+    def _find_pacman(data):
+        pacmanState = None
+        for agentState in data.agentStates:
+            if agentState.isPacman:
+                pacmanState = agentState
+                break
+        assert(pacmanState)
+        return pacmanState
+
     @staticmethod
     def move_pacman(game):
         '''
         move pacman to any free pos on the map.
         '''
         data = game.state.data
-        # find pacman.
-        def find_pacman(new_data):
-            pacmanState = None
-            for agentState in new_data.agentStates:
-                if agentState.isPacman:
-                    pacmanState = agentState
-                    break
-            assert(pacmanState)
-            return pacmanState
 
         # create all valid modifications of pacman.
         game_nb = []
         for (x, y) in GameEditor._find_free_pos(data):
                 for dir in Directions.ALL:
                     new_data = data.deepCopy()
-                    pacmanState = find_pacman(new_data)
+                    pacmanState = GameEditor._find_pacman(new_data)
                     pacmanState.configuration.pos = (x, y) # change the state.
                     pacmanState.configuration.direction = dir
                     new_game = game.deepCopy()
@@ -315,6 +320,21 @@ class GameEditor(object):
             game_nb.extend(GameEditor.move_ghost(game, ghost_index))
         return game_nb
 
+    @staticmethod
+    def del_food(game):
+        data = game.state.data
+        config = data.array()
+        width, height = data.layout.width, data.layout.height
+        game_nb = []
+        for x in range(width):
+            for y in range(height):
+                if config['food'][x, y] == 1:
+                    new_data = data.deepCopy()
+                    new_data.food[x][y] = 0
+                    new_game = game.deepCopy()
+                    new_game.state.data = new_data
+                    game_nb.append(new_game)
+        return game_nb
 
 class PacmanTaskShifter(object):
     """
@@ -343,7 +363,22 @@ class PacmanTaskFeature(object):
     def featurize_num_ghost(task):
         game = task.game
         data = game.state.data
-        feat = dict()
-        feat['#ghost'] = len(data.agentStates) - 1.
-        feat['bias'] = 1.
-        return feat
+        return len(data.agentStates) - 1.
+
+class PacmanTaskDistance(object):
+    @staticmethod
+    def dist_num_ghost(task_a, task_b):
+        return float(abs(PacmanTaskFeature.featurize_num_ghost(task_a)
+                   - PacmanTaskFeature.featurize_num_ghost(task_b)))
+
+    @staticmethod
+    def dist_food(task_a, task_b):
+        get_food = lambda task: task.game.state.data.array()['food']
+        return float(np.sum(np.abs(get_food(task_a) - get_food(task_b))))
+
+    @staticmethod
+    def dist_pacman(task_a, task_b):
+        (xa, ya) = GameEditor._find_pacman(task_a.game.state.data).configuration.pos
+        (xb, yb) = GameEditor._find_pacman(task_b.game.state.data).configuration.pos
+        return float(abs(xa - xb) + abs(ya - yb))
+
