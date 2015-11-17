@@ -58,7 +58,7 @@ class Conv(object):
     '''
     convolution layers.
     '''
-    def __init__(self, input_dim, output_dim, filter_size = (2, 2), pool_size = (2, 2), activation='relu'):
+    def __init__(self, input_dim, output_dim, filter_size = (2, 2), pool_size = (2, 2), activation='relu', border_mode='valid'):
         '''
             TODO: choice of initialization
                     - Currently uses the initialization scheme for relu
@@ -93,11 +93,12 @@ class Conv(object):
         self.b = b
         self.filter_size = filter_size
         self.pool_size = pool_size
+        self.border_mode = border_mode
         self.params = [self.W, self.b]
 
     def __call__(self, inputs):
         # set-up the outputs
-        conv_out = T.nnet.conv.conv2d(inputs, self.W) + self.b.dimshuffle('x', 0, 'x', 'x')
+        conv_out = T.nnet.conv.conv2d(inputs, self.W, border_mode=self.border_mode) + self.b.dimshuffle('x', 0, 'x', 'x')
         pool_out = max_pool_2d(input=conv_out, ds=self.pool_size, ignore_border=True)
         return pool_out
 

@@ -161,8 +161,9 @@ class DeepQlearn(object):
         '''
         # don't update the network until sufficient experience has been
         # accumulated
-        if len(self.experience) < self.memory_size:
-            return
+        # removing this might cause correlation for early samples. suggested to be used in curriculums.
+        #if len(self.experience) < self.memory_size:
+        #    return
 
         states = [None] * self.minibatch_size
         next_states = [None] * self.minibatch_size
@@ -224,6 +225,7 @@ class DeepQlearn(object):
         if self.last_state is not None:
             self._add_to_experience(self.last_state, self.last_action, None,
                                     reward, [])
+            # self._update_net()
         self.last_state = None
         self.last_action = None
 

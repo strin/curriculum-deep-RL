@@ -5,7 +5,7 @@ import numpy.random as npr
 import theano
 import theano.tensor as T
 import cPickle as pickle
-from theano.printing import pydotprint
+# from theano.printing import pydotprint
 
 import pyrl.layers
 import pyrl.optimizers

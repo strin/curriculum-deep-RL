@@ -4,7 +4,7 @@ import numpy.random as npr
 import theano
 import theano.tensor as T
 from IPython.display import Image
-from theano.printing import pydotprint
+# from theano.printing import pydotprint
 import layers
 import optimizers
 import cPickle as pickle

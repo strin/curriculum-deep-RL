@@ -4,7 +4,7 @@ Some util functions for constructing neural networks.
 
 import theano
 import theano.tensor as T
-from theano.printing import pydotprint
+# from theano.printing import pydotprint
 import numpy as np
 
 import layers

@@ -4,7 +4,7 @@ import numpy.random as npr
 import theano
 import theano.tensor as T
 import cPickle as pickle
-from theano.printing import pydotprint
+# from theano.printing import pydotprint
 
 from pyrl.tasks.task import Environment
 from pyrl.agents.agent import DQN

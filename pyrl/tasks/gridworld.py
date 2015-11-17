@@ -40,10 +40,11 @@ class GridWorld(Task):
 
         # state representation.
         (h, w) = self.grid.shape
-        self.state_3d = np.zeros((2, h, w))
+        self.state_3d = np.zeros((3, h, w))
         self.state_3d[0, self.curr_pos[0], self.curr_pos[1]] = 1.
         for pos in self.goal:
             self.state_3d[1, pos[0], pos[1]] = 1.
+        self.state_3d[2, :, :] = self.grid
 
         # start the game fresh.
         self.reset()
@@ -72,7 +73,7 @@ class GridWorld(Task):
     @property
     def curr_state(self):
         '''
-        state is a 1x2HxW tensor.
+        state is a 3xHxW tensor [state, goal, wall]
         should deep copy the state as it will go into the experience buffer.
         '''
         return np.array(self.state_3d)
