@@ -254,7 +254,7 @@ class DeepQlearnMT(object):
     backpropagation is based on experiences sampled from all buffers.
     '''
     def __init__(self, dqn_mt, gamma=0.95, l2_reg=0.0, lr=1e-3,
-               memory_size=250, minibatch_size=64, epsilon=0.05):
+               memory_size=250, minibatch_size=64, epsilon=0.05, update_strategy=None):
         '''
         (TODO): task should be task info.
         we don't use all of task properties/methods here.
@@ -267,6 +267,7 @@ class DeepQlearnMT(object):
         self.epsilon = epsilon
         self.memory_size = memory_size
         self.minibatch_size = minibatch_size
+        self.update_strategy = update_strategy
         self.gamma = gamma
 
         # for now, keep experience as a list of tuples
@@ -331,16 +332,20 @@ class DeepQlearnMT(object):
             sample from the memory dataset and perform gradient descent on
             (target - Q(s, a))^2
         '''
-        if self.total_exp_by_task[task] < self.memory_size:
-            return
+        #if self.total_exp_by_task[task] < self.memory_size:
+        #    return
 
         # merge experience buffer.
         experience = []
         for task in self.ex_task:
             experience.extend(self.ex_task[task])
 
-        # do one pass.
-        for it in range(len(self.ex_task)):
+        num_iter = 1
+        if self.update_strategy:
+            if self.update_strategy == 'task':
+                num_iter = len(self.ex_task)
+
+        for it in range(num_iter):
             # don't update the network until sufficient experience has been
             # accumulated
             states = [None] * self.minibatch_size

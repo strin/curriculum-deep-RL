@@ -147,3 +147,9 @@ def eval_dataset(policy, tasks, method=expected_reward_tabular_normalized):
     for task in tasks:
         reward += method(policy, task, tol=1e-4)
     return reward / len(tasks)
+
+def merge_line(xs, ys):
+    """
+    given a list of score lines, merge and average them into one.
+    """
+

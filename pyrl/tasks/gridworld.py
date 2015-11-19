@@ -19,7 +19,7 @@ class GridWorld(Task):
 
     actions = [N, E, W, S]
 
-    def __init__(self, grid, action_stoch, goal, rewards, wall_penalty, gamma):
+    def __init__(self, grid, action_stoch, goal, rewards, wall_penalty):
         ''' grid is a 2D numpy array with 0 indicates where the agent
             can pass and 1 indicates an impermeable wall.
 
@@ -36,7 +36,6 @@ class GridWorld(Task):
         self.wall_penalty = wall_penalty
         self.rewards = rewards
         self.env = grid
-        self.gamma = gamma
 
         # state representation.
         (h, w) = self.grid.shape
@@ -138,9 +137,9 @@ class GridWorld(Task):
         plt.axis('off')
 
 class GridWorldFixedStart(GridWorld):
-    def __init__(self, start_pos, grid, action_stoch, goal, rewards, wall_penalty, gamma):
+    def __init__(self, start_pos, grid, action_stoch, goal, rewards, wall_penalty):
         self.start_pos = start_pos
-        GridWorld.__init__(self, grid, action_stoch, goal, rewards, wall_penalty, gamma)
+        GridWorld.__init__(self, grid, action_stoch, goal, rewards, wall_penalty)
         assert(start_pos in self.free_pos)
 
     def reset(self):
