@@ -537,3 +537,124 @@ class GPv2(object):
             self.diagnostics['new-tasks'] = new_tasks
             self.diagnostics['new-tasks-selected'] = new_tasks_selected
             self.diagnostics['active-tasks'] = active_tasks
+
+
+class GPv3(object):
+    '''
+    an expert is a meta-feature, which is a function past-tasks and improvements.
+
+    in V1, we collect experiences only for tasks in active set.
+    '''
+    def __init__(self, dqn, feat_func, sample_func, kernel_func, train_func, eval_func,
+                 init_setting=None, eta=1., sigma_n=0.01, K=10):
+        '''
+        train_func: atomic operation to train an agent on a task.
+
+        eval_func: atomic operation to evaluate an agent on a task, and get a score.
+        '''
+        # some params.
+        self.K = K
+        self.sigma_n = sigma_n
+
+        # components.
+        self.kernel_func = kernel_func
+        self.feat_func = feat_func
+        self.sample_func = sample_func
+        self.init_setting = init_setting
+        self.train_func = train_func
+        self.eval_func = eval_func
+
+        # representation.
+        self.task_im = {}
+        self.active_tasks = set()
+        self.passive_tasks = set()
+        self.task_count = {}
+        self.task_score = {}
+        self.dqn = dqn
+        self.eta = eta
+
+        self.im_pred = {} # prediction of improvement per task.
+        self.im_sigma = {} # uncertainty of improvement per task.
+        self.im_ucb = {} # confidence upper bound.
+
+        # some diagnostic statistics.
+        self.diagnostics = {}
+
+    def run(self, tasks, num_epochs=1):
+        # set local variables.
+        K = self.K
+        all_settings = set()
+        for task in tasks:
+            all_settings.add(self.feat_func(task))
+        all_settings = list(all_settings)
+
+        for task in tasks:
+            if task not in self.task_score:
+                self.task_score[task] = self.eval_func(task)
+
+        for ni in range(num_epochs):
+            im_pred = {}
+            im_sigma = {}
+            im_ucb = {}
+
+            if len(self.task_im) < 1:
+                # select task based on prior.
+                if not self.init_setting:
+                    chosen_task = prob.choice(tasks, 1)
+                else:
+                    chosen_task = self.sample_func(self.init_setting)
+            else:
+                # select task based on GP.
+                im = [(self.feat_func(task), im) for (task, im) in self.task_im.items()]
+
+                # use Gaussian Process to estimate potential function.
+                N = len(im)
+                KXX = np.zeros((N, N))
+                y = np.zeros(N)
+                for (ti, (setting_i, im_i)) in enumerate(im):
+                    for (tj, (setting_j, im_j)) in enumerate(im):
+                        KXX[ti, tj] = self.kernel_func(setting_i, setting_j)
+                for (ti, (setting_i, im_i)) in enumerate(im):
+                    y[ti] = im_i
+
+                M = len(all_settings)
+                KXsX = np.zeros((M, N))
+                KXsXs = np.zeros((M, M))
+                for (ti, setting_i) in enumerate(all_settings):
+                    for (tj, (setting_j, im_j)) in enumerate(im):
+                        KXsX[ti, tj] = self.kernel_func(setting_i, setting_j)
+                    KXsXs[ti, ti] = self.kernel_func(setting_i, setting_i)
+
+                KXXinv = npla.inv(KXX + self.sigma_n**2 * np.eye(N))
+
+                pred_mean = np.dot(KXsX, np.dot(KXXinv, y))
+                pred_cov = KXsXs - np.dot(KXsX, np.dot(KXXinv, np.transpose(KXsX)))
+                pred_sigma = np.sqrt(np.diag(pred_cov))
+
+                for (ti, setting) in enumerate(all_settings):
+                    im_pred[setting] = pred_mean[ti]
+                    im_sigma[setting] = pred_sigma[ti]
+                    im_ucb[setting] = pred_mean[ti] + self.eta * pred_sigma[ti]
+
+                new_settings = sorted(all_settings, key=lambda setting: im_ucb[setting], reverse=True)
+                new_setting = new_settings[0]
+
+                chosen_task = self.sample_func(new_setting)
+
+            self.train_func(chosen_task)
+
+            for task in tasks:
+                score = self.eval_func(task)
+                self.task_im[task] = score - self.task_score[task]
+                self.task_score[task] = score
+
+            # collect diagnostics.
+            self.diagnostics['task_im'] = self.task_im
+            self.diagnostics['task_score'] = self.task_score
+            self.diagnostics['pred'] = im_pred
+            self.diagnostics['sigma'] = im_sigma
+            self.diagnostics['ucb'] = im_ucb
+            self.diagnostics['task'] = chosen_task
+            self.diagnostics['setting'] = self.feat_func(chosen_task)
+
+
