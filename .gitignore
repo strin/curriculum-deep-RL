@@ -25,3 +25,7 @@ scripts
 # other.
 venv/*
 
+# specific folders
+data
+external
+experiments
