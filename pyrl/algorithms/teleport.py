@@ -143,7 +143,7 @@ class GPv0a(object):
     an expert is a meta-feature, which is a function past-tasks and improvements.
     '''
     def __init__(self, dqn, kernel_func, expand_func, train_func, eval_func,
-                 eta=1., sigma_n=0.01, K=5, K0=1):
+                 init_tasks=None, eta=1., sigma_n=0.01, K=5, K0=1):
         '''
         train_func: atomic operation to train an agent on a task.
 
@@ -160,6 +160,7 @@ class GPv0a(object):
         self.expand_func = expand_func
         self.train_func = train_func
         self.eval_func = eval_func
+        self.init_tasks = init_tasks
 
         # representation.
         self.active_tasks = set()
@@ -183,7 +184,10 @@ class GPv0a(object):
 
         if len(self.active_tasks) == 0: # initial round.
             # chose a set of active tasks uniformly at random.
-            self.active_tasks = set(prob.choice(tasks, size=K+K0, replace=True))
+            if self.init_tasks:
+                self.active_tasks = set(prob.choice(self.init_tasks, size=K+K0, replace=True))
+            else:
+                self.active_tasks = set(prob.choice(tasks, size=K+K0, replace=True))
 
         for ni in range(num_epochs):
             active_tasks = self.active_tasks

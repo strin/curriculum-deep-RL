@@ -3,7 +3,7 @@ import numpy.random as npr
 from pyrl.tasks.task import Task
 from pyrl.algorithms.valueiter import compute_tabular_value
 
-def reward_stochastic_samples(policy, task, gamma=0.95, num_trials = 100, tol=1e-6, **args):
+def reward_stochastic_samples(policy, task, gamma=0.95, num_trials = 100, budget=None, tol=1e-6, **args):
     total_reward = []
 
     for ni in range(num_trials):
@@ -14,6 +14,10 @@ def reward_stochastic_samples(policy, task, gamma=0.95, num_trials = 100, tol=1e
         while num_steps < np.log(tol) / np.log(gamma):
             if task.is_end():
                 break
+
+            if budget and num_steps >= budget:
+                break
+
             curr_state = task.curr_state
             # action = policy.get_action(curr_state, method='eps-greedy', epsilon=0., valid_actions=task.valid_actions)
             action = policy.get_action(curr_state, valid_actions=task.valid_actions, **args)
@@ -52,8 +56,8 @@ def qval_stochastic_samples(dqn, task, gamma=0.95, num_trials = 100, budget=20, 
     task.reset()
     return total_reward
 
-def reward_stochastic(policy, task, gamma=0.95, num_trials=100, tol=1e-6, **args):
-    total_reward = reward_stochastic_samples(policy, task, gamma, num_trials, tol, **args)
+def reward_stochastic(policy, task, gamma=0.95, num_trials=100, budget=None, tol=1e-6, **args):
+    total_reward = reward_stochastic_samples(policy, task, gamma, num_trials, budget, tol, **args)
     return np.mean(total_reward)
 
 def qval_stochastic(policy, task, gamma=0.95, num_trials=100, budget=20, **args):

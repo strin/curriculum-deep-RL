@@ -28,22 +28,18 @@ class GridWorld(Task):
             '''
         self.grid = grid
         self.action_stoch = action_stoch
-        self.goal = goal
+        self.goal = dict(goal)
         self.free_pos = self._free_pos()
         self.curr_pos = random.choice(self.free_pos)
         self.hit_wall = False
 
         self.wall_penalty = wall_penalty
-        self.rewards = rewards
+        self.rewards = dict(rewards)
         self.env = grid
 
-        # state representation.
-        (h, w) = self.grid.shape
-        self.state_3d = np.zeros((3, h, w))
-        self.state_3d[0, self.curr_pos[0], self.curr_pos[1]] = 1.
-        for pos in self.goal:
-            self.state_3d[1, pos[0], pos[1]] = 1.
-        self.state_3d[2, :, :] = self.grid
+        # save initial state
+        self.init_goal = dict(goal)
+        self.init_rewards = dict(rewards)
 
         # start the game fresh.
         self.reset()
@@ -65,9 +61,15 @@ class GridWorld(Task):
 
     def reset(self):
         self.hit_wall = False
-        self.state_3d[0, self.curr_pos[0], self.curr_pos[1]] = 0.
         self.curr_pos = random.choice(self.free_pos)
+        self.goal = dict(self.init_goal)
+        self.rewards = dict(self.init_rewards)
+        (h, w) = self.grid.shape
+        self.state_3d = np.zeros((3, h, w))
         self.state_3d[0, self.curr_pos[0], self.curr_pos[1]] = 1.
+        for pos in self.goal:
+            self.state_3d[1, pos[0], pos[1]] = 1.
+        self.state_3d[2, :, :] = self.grid
 
     @property
     def curr_state(self):
@@ -106,6 +108,8 @@ class GridWorld(Task):
             or state[1] >= self.grid.shape[1] or self.grid[state[0], state[1]]
 
     def step(self, action):
+        reward = 0.
+
         # update state_3d matrix
         self.state_3d[0, self.curr_pos[0], self.curr_pos[1]] = 0.
 
@@ -123,18 +127,40 @@ class GridWorld(Task):
         # update state_3d matrix.
         self.state_3d[0, self.curr_pos[0], self.curr_pos[1]] = 1.
 
-        # return reward.
-        if self.curr_pos not in self.rewards:
-            return 0.
-        else:
-            return float(self.rewards[self.curr_pos])
+        # update goal.
+        if self.curr_pos in self.goal:
+            self.state_3d[1, self.curr_pos[0], self.curr_pos[1]] = 0.
+            reward = float(self.rewards[self.curr_pos])
+            del self.goal[self.curr_pos]
+            del self.rewards[self.curr_pos]
+
+        return reward
 
     def is_end(self):
-        return self.curr_pos in self.goal
+        return len(self.goal) == 0
 
-    def visualize(self):
-        plt.imshow(self.grid)
-        plt.axis('off')
+    def visualize(self, fname = None):
+        fig = plt.figure(1, figsize=(5,5))
+        plt.clf()
+        ax = fig.add_axes([0.0, 0.0, 1., 1.])
+        plt.imshow(np.transpose(self.grid), interpolation='none', vmax=1.0, vmin=0.0, aspect='auto')
+        for g in self.goal.keys():
+            circle = plt.Circle(g, radius=.3, color='w')
+            ax.add_artist(circle)
+        (x, y) = self.curr_pos
+        y = self.grid.shape[0] - 1 - y
+        x /= float(self.grid.shape[1])
+        y /= float(self.grid.shape[0])
+        axicon = fig.add_axes([x, y, 1. / self.grid.shape[1], 1. / self.grid.shape[0]])
+        im = plt.imread(__file__[:__file__.rfind('/')] + '/pacman.png')
+        axicon.imshow(im, interpolation='nearest')
+        axicon.axis('off')
+        ax.axis('off')
+        if fname:
+            plt.savefig(fname)
+        else:
+            plt.show()
+
 
 class GridWorldFixedStart(GridWorld):
     def __init__(self, start_pos, grid, action_stoch, goal, rewards, wall_penalty):
@@ -143,7 +169,7 @@ class GridWorldFixedStart(GridWorld):
         assert(start_pos in self.free_pos)
 
     def reset(self):
-        self.hit_wall = False
+        GridWorld.reset(self)
         self.state_3d[0, self.curr_pos[0], self.curr_pos[1]] = 0.
         self.curr_pos = self.start_pos
         self.state_3d[0, self.curr_pos[0], self.curr_pos[1]] = 1.
