@@ -27,18 +27,17 @@ class UnlockRoom(Task):
             environment makes a random transition
             '''
         self.grid = grid
+        self.start_pos = start_pos
+        self.door_pos = door_pos
+        self.key_pos = key_pos
         self.action_stoch = action_stoch
+
         self.free_pos = self._free_pos()
         self.curr_pos = random.choice(self.free_pos)
         self.hit_wall = False
 
         self.wall_penalty = wall_penalty
         self.env = grid
-
-        # save initial state
-        self.start_pos = start_pos
-        self.door_pos = door_pos
-        self.key_pos = key_pos
 
         # start the game fresh.
         self.reset()
@@ -127,21 +126,25 @@ class UnlockRoom(Task):
         if self.curr_pos == self.key_pos:
             self.state_3d[2, self.key_pos[0], self.key_pos[1]] = 0.
 
-        if self.curr_pos == self.door_pos:
+        if self.curr_pos == self.door_pos and self.state_3d[2, self.key_pos[0], self.key_pos[1]] == 0.:
             reward = 1.
 
         return reward
 
     def is_end(self):
-        return self.curr_pos == self.door_pos
+        return self.curr_pos == self.door_pos and self.state_3d[2, self.key_pos[0], self.key_pos[1]] == 0.
+
+    def __repr__(self):
+        return str(self.start_pos) + '->' + str(self.key_pos) + '->' + str(self.door_pos)
 
     def visualize(self, fname = None):
         fig = plt.figure(1, figsize=(5,5))
         plt.clf()
         ax = fig.add_axes([0.0, 0.0, 1., 1.])
         plt.imshow(np.transpose(self.grid), interpolation='none', vmax=1.0, vmin=0.0, aspect='auto')
-        circle = plt.Circle(self.key_pos, radius=.3, color='y')
-        ax.add_artist(circle)
+        if self.state_3d[2, self.key_pos[0], self.key_pos[1]] == 1.:
+            circle = plt.Circle(self.key_pos, radius=.3, color='y')
+            ax.add_artist(circle)
         circle = plt.Circle(self.door_pos, radius=.3, color='w')
         ax.add_artist(circle)
         (x, y) = self.curr_pos
