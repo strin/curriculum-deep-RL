@@ -151,8 +151,6 @@ class DQN(Qfunc):
         qvals = self.fprop(state).reshape(-1)[valid_actions]
         qvals = qvals / temperature
         p = np.exp(prob.normalize_log(qvals))
-        print 'qvals', qvals
-        print 'p', p
         return p
 
     def _get_softmax_action(self, state_vector, temperature, valid_actions):

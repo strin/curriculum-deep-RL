@@ -307,7 +307,6 @@ def MSE(inputs, targets):
     '''
     return T.mean(T.sqr(inputs - targets))
 
-
 def SoftMax(inputs):
     # return T.nnet.softmax(self.inputs)
 

@@ -9,12 +9,13 @@ import pyrl.prob as prob
 from pyrl.layers import SoftMax
 
 class DeepDistill(object):
-    def __init__(self, dqn_mt, memory_size=128, l2_reg=0., minibatch_size=128):
+    def __init__(self, dqn_mt, memory_size=128, lr=1e-3, l2_reg=0., minibatch_size=128):
         '''
         '''
         self.memory_size = memory_size
         self.l2_reg = l2_reg
         self.minibatch_size = minibatch_size
+        self.lr = lr
 
         # experience is a dict: task -> experience buffer.
         # an experience buffer is a list of tuples (s, q, va)
@@ -23,6 +24,8 @@ class DeepDistill(object):
         self.ex_id = {}
         self.total_exp = 0
         self.dqn_mt = dqn_mt
+
+        self._compile_bp()
 
 
     def _compile_bp(self):
@@ -119,6 +122,7 @@ class DeepDistill(object):
         probs = [None] * self.minibatch_size
 
         experience = sum(self.experience.values(), [])
+
         for it in range(num_iter):
             samples = prob.choice(experience, self.minibatch_size, replace=True)
             for idx, sample in enumerate(samples):
@@ -128,12 +132,13 @@ class DeepDistill(object):
                 is_valids[idx] = is_valid
                 probs[idx] = p
 
-        # convert into numpy array.
-        states = np.array(states)
-        is_valids = np.array(is_valids)
-        probs = np.array(probs)
+            # convert into numpy array.
+            states = np.array(states)
+            is_valids = np.array(is_valids)
+            probs = np.array(probs)
 
-        error = self.bprop(states, probs, is_valids)
+            error = self.bprop(states, probs, is_valids)
+            print 'error', error
 
 
 
