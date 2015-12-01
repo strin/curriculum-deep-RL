@@ -57,6 +57,94 @@ class OracleIm(object):
             self.train_func(self.learner, chosen_task)
 
 
+class GPt(object):
+    def __init__(self, train_func, eval_func, kernel_func, gpt_sigma, gpt_kappa):
+        '''
+        GP-t algorithms based multi-task single learner.
+        aims to model I(t, task) as approximation of I(M, task).
+
+        GP-t uses a Gaussian Process regression to infer progress in task space at a given time t.
+
+        The covariance is defined as
+        The function is defined as $$p(f \mid X) = \mathcal{N}(0, K)$$
+
+        Hyper-Parameters
+        ==========
+        gpt_sigma: noise level.
+        gpt_kappa: tradeoff hyper-parameter for exploration-exploitation tradeoff.
+        '''
+        self.gpt_sigma = gpt_sigma
+        self.gpt_kappa = gpt_kappa
+
+        self.train_func = train_func
+        self.eval_func = eval_func
+        self.kernel_func = kernel_func
+
+        # GP.
+        self.ims = []   # collect (task, im) tuples that track progress.
+        self.t = 0
+
+        # some diagnostic information.
+        self.diagnostics = {}
+
+    def run(self, tasks, num_epochs=1, num_episodes=1):
+        for ei in range(num_epochs):
+            t = self.t
+
+            # task selection.
+            if t == 0: # no prior experience, choose randomly.
+                task = prob.choice(tasks, 1)[0]
+            else:
+                # GP-t.
+                N = len(self.ims)
+                KXX = np.zeros((N, N))
+                y = np.zeros(N)
+
+                for (t_i, (task_i, im_i)) in enumerate(self.ims):
+                    for (t_j, (task_j, im_j)) in enumerate(self.ims):
+                        KXX[t_i, t_j] = self.kernel_func(t_i, task_i, t_j, task_j)
+
+                for (ti, (task_i, im_i)) in enumerate(self.ims):
+                    y[ti] = im_i
+
+                M = len(tasks)
+                KXsX = np.zeros((M, N))
+                KXsXs = np.zeros((M, M))
+
+                for (t_i, task_i) in enumerate(tasks):
+                    for (t_j, (task_j, im_j)) in enumerate(self.ims):
+                        KXsX[t_i, t_j] = self.kernel_func(t, task_i, t_j, task_j)
+                    KXsXs[t_i, t_i] = self.kernel_func(t, task_i, t, task_i)
+
+                KXXinv = npla.inv(KXX + self.gpt_sigma ** 2 * np.eye(N))
+
+                pred_mean = np.dot(KXsX, np.dot(KXXinv, y))
+                pred_cov = KXsXs - np.dot(KXsX, np.dot(KXXinv, np.transpose(KXsX)))
+                pred_sigma = np.sqrt(np.diag(pred_cov))
+
+                pred_ucb = pred_mean + self.gpt_kappa * pred_sigma
+
+                best_ti = np.argmax(pred_ucb)
+                task = tasks[best_ti]
+
+                # store information for diagnosis.
+                self.diagnostics['mean'] = {str(task): mean for (task, mean) in zip(tasks, pred_mean)}
+                self.diagnostics['sigma'] = {str(task): sigma for (task, sigma) in zip(tasks, pred_sigma)}
+                self.diagnostics['ucb'] = {str(task): ucb for (task, ucb) in zip(tasks, pred_ucb)}
+
+            score_before = self.eval_func(task)
+            self.train_func(task)
+            score_after = self.eval_func(task)
+            im = score_after - score_before
+
+            self.diagnostics['chosen_task'] = str(task)
+            self.diagnostics['im'] = im
+
+            self.ims.append((task, im))
+            self.t += 1
+
+
+
 class GPv0(object):
     def __init__(self, dqn, kernel_func, expand_func, train_func, eval_func,
                  eta=1., sigma_n=0.01, K0=5, K=1):
