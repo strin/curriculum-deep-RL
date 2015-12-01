@@ -116,6 +116,18 @@ class DeepQlearn(object):
         # compile back-propagtion network
         self._compile_bp()
 
+    def copy(self):
+        # copy dqn.
+        dqn_mt = self.dqn.copy()
+        learner = DeepQlearn(dqn_mt, self.gamma, self.l2_reg, self.lr, self.memory_size, self.minibatch_size, self.epsilon)
+        learner.experience = list(self.experience)
+        learner.exp_idx = self.exp_idx
+        learner.total_exp = self.total_exp
+        learner.last_state = self.last_state
+        learner.last_action = self.last_action
+        learner._compile_bp()
+        return learner
+
     def _compile_bp(self):
         states = self.dqn.states
         action_values = self.dqn.action_values

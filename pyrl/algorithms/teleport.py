@@ -4,6 +4,7 @@ import random
 import numpy as np
 import numpy.linalg as npla
 import numpy.random as npr
+import dill as pickle
 
 import pyrl.optimizers as optimizers
 import pyrl.layers as layers
@@ -17,10 +18,46 @@ from pyrl.algorithms.valueiter import DeepQlearn
 from pyrl.algorithms.multitask import DeepQlearnMT
 
 
+class OracleIm(object):
+    '''
+    Select task based on oracle improvment.
+    To save computation, it only chooses the task with best improvment among a set of pre-selected tasks.
+    The set of pre-selected tasks are chosen uniformly at random.
+    '''
+    def __init__(self, learner, num_sample, train_func, eval_func):
+        self.train_func = train_func
+        self.eval_func = eval_func
+        self.num_sample = num_sample
+        self.learner = learner
+
+        self.diagnostics = {}
+
+    def _eval_im(self, task):
+        score_before = self.eval_func(self.learner, task)
+        new_learner = self.learner.copy()
+        self.train_func(new_learner, task)
+        score_after = self.eval_func(new_learner, task)
+        print 'task', task, 'before', score_before, 'after', score_after
+        return score_after - score_before
+
+    def run(self, tasks, num_epochs=1):
+        for ni in range(num_epochs):
+            sub_tasks = prob.choice(tasks, size=self.num_sample, replace=False)
+            ims = []
+            self.diagnostics['im_task'] = {}
+            for task in sub_tasks:
+                im = self._eval_im(task)
+                ims.append(im)
+                self.diagnostics['im_task'][task] = im
+
+            max_ind = np.argmax(ims)
+            chosen_task = sub_tasks[max_ind]
+            self.diagnostics['chosen_task'] = str(chosen_task)
+
+            self.train_func(self.learner, chosen_task)
+
+
 class GPv0(object):
-    '''
-    an expert is a meta-feature, which is a function past-tasks and improvements.
-    '''
     def __init__(self, dqn, kernel_func, expand_func, train_func, eval_func,
                  eta=1., sigma_n=0.01, K0=5, K=1):
         '''

@@ -86,6 +86,10 @@ class DQN(Qfunc):
         self.state_type = state_type
         self._initialize_net()
 
+    def copy(self):
+        import dill as pickle
+        return pickle.loads(pickle.dumps(self))
+
     def is_tabular(self):
         return False
 
