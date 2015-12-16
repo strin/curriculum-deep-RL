@@ -398,6 +398,251 @@ class GPv0a(object):
             self.diagnostics['active-tasks'] = self.active_tasks
             self.diagnostics['passive-tasks'] = self.passive_tasks
 
+
+class GPdatb(object):
+    def __init__(self, dqn, kernel_func, train_func, eval_func,
+                 init_tasks=None, eta=1., sigma_n=0.01, K=1, K0=5):
+        '''
+        train_func: atomic operation to train an agent on a task.
+
+        eval_func: atomic operation to evaluate an agent on a task, and get a score.
+
+        '''
+        # some params.
+        self.K = K
+        self.K0 = K0
+        self.sigma_n = sigma_n
+
+        # components.
+        self.kernel_func = kernel_func
+        self.train_func = train_func
+        self.eval_func = eval_func
+        self.init_tasks = init_tasks
+
+        # representation.
+        self.active_tasks = set()
+        self.task_count = {}
+        self.task_score = {}
+        self.dqn = dqn
+        self.eta = eta
+
+        self.im_pred = {} # prediction of improvement per task.
+        self.im_sigma = {} # uncertainty of improvement per task.
+        self.im_ucb = {} # confidence upper bound.
+
+        # some diagnostic statistics.
+        self.diagnostics = {}
+
+    def run(self, tasks, num_epochs=1):
+        # set local variables.
+        K = self.K
+        K0 = self.K0
+
+        # initial round.
+        if len(self.active_tasks) == 0:
+            # chose a set of active tasks uniformly at random.
+            if self.init_tasks:
+                self.active_tasks = set(prob.choice(self.init_tasks, size=K0, replace=False))
+            else:
+                self.active_tasks = set(prob.choice(tasks, size=K0, replace=False))
+
+        for ni in range(num_epochs):
+            active_tasks = self.active_tasks
+            curr_tasks = active_tasks
+
+            # compute old score if necessary.
+            for task in curr_tasks:
+                if task not in self.task_score:
+                    self.task_score[task] = self.eval_func(task)
+
+            # learn on each task.
+            for it in range(1):
+                for task in active_tasks:
+                    self.train_func(task)
+
+            # evaluate improvement.
+            im = {}
+            for task in curr_tasks:
+                new_score = self.eval_func(task)
+                im[task] = new_score - self.task_score[task]
+                self.task_score[task] = new_score
+
+            # create candidate set.
+            new_tasks = tasks
+            if len(new_tasks) == 0:
+                print 'WARNING: new tasks is empty in GP'
+
+            # use Gaussian Process to estimate potential function.
+            N = len(im)
+            KXX = np.zeros((N, N))
+            y = np.zeros(N)
+            for (ti, (task_i, im_i)) in enumerate(im.items()):
+                for (tj, (task_j, im_j)) in enumerate(im.items()):
+                    KXX[ti, tj] = self.kernel_func(task_i, task_j)
+            for (ti, (task_i, im_i)) in enumerate(im.items()):
+                y[ti] = im_i
+
+            M = len(new_tasks)
+            KXsX = np.zeros((M, N))
+            KXsXs = np.zeros((M, M))
+            for (ti, task_i) in enumerate(new_tasks):
+                for (tj, (task_j, im_j)) in enumerate(im.items()):
+                    KXsX[ti, tj] = self.kernel_func(task_i, task_j)
+                KXsXs[ti, ti] = self.kernel_func(task_i, task_i)
+
+            KXXinv = npla.inv(KXX + self.sigma_n**2 * np.eye(N))
+
+            pred_mean = np.dot(KXsX, np.dot(KXXinv, y))
+            pred_cov = KXsXs - np.dot(KXsX, np.dot(KXXinv, np.transpose(KXsX)))
+            pred_sigma = np.sqrt(np.diag(pred_cov))
+
+            im_pred = {}
+            im_sigma = {}
+            im_ucb = {}
+            for (ti, task) in enumerate(new_tasks):
+                im_pred[task] = pred_mean[ti]
+                im_sigma[task] = pred_sigma[ti]
+                im_ucb[task] = pred_mean[ti] + self.eta * pred_sigma[ti]
+
+            new_tasks = sorted(new_tasks, key=lambda task: im_ucb[task], reverse=True)
+            new_tasks_selected = new_tasks[:K]
+
+            self.active_tasks = set(new_tasks_selected)
+
+            # collect diagnostics.
+            self.diagnostics['im'] = im
+            self.diagnostics['pred'] = im_pred
+            self.diagnostics['sigma'] = im_sigma
+            self.diagnostics['ucb'] = im_ucb
+            self.diagnostics['score'] = self.task_score
+            self.diagnostics['new-tasks'] = new_tasks
+            self.diagnostics['new-tasks-selected'] = new_tasks_selected
+            self.diagnostics['active-tasks'] = self.active_tasks
+
+
+class GPda(object):
+    '''
+    an expert is a meta-feature, which is a function past-tasks and improvements.
+    '''
+    def __init__(self, dqn, kernel_func, train_func, eval_func,
+                 init_tasks=None, eta=1., sigma_n=0.01, K=1, K0=5):
+        '''
+        train_func: atomic operation to train an agent on a task.
+
+        eval_func: atomic operation to evaluate an agent on a task, and get a score.
+
+        '''
+        # some params.
+        self.K = K
+        self.K0 = K0
+        self.sigma_n = sigma_n
+
+        # components.
+        self.kernel_func = kernel_func
+        self.train_func = train_func
+        self.eval_func = eval_func
+        self.init_tasks = init_tasks
+
+        # representation.
+        self.active_tasks = set()
+        self.task_count = {}
+        self.task_score = {}
+        self.dqn = dqn
+        self.eta = eta
+
+        self.im_pred = {} # prediction of improvement per task.
+        self.im_sigma = {} # uncertainty of improvement per task.
+        self.im_ucb = {} # confidence upper bound.
+
+        # some diagnostic statistics.
+        self.diagnostics = {}
+
+    def run(self, tasks, num_epochs=1):
+        # set local variables.
+        K = self.K
+        K0 = self.K0
+
+        # initial round.
+        if len(self.active_tasks) == 0:
+            # chose a set of active tasks uniformly at random.
+            if self.init_tasks:
+                self.active_tasks = set(prob.choice(self.init_tasks, size=K0, replace=False))
+            else:
+                self.active_tasks = set(prob.choice(tasks, size=K0, replace=False))
+
+        for ni in range(num_epochs):
+            active_tasks = self.active_tasks
+            curr_tasks = active_tasks
+
+            # compute old score if necessary.
+            for task in curr_tasks:
+                if task not in self.task_score:
+                    self.task_score[task] = self.eval_func(task)
+
+            # learn on each task.
+            for it in range(1):
+                for task in active_tasks:
+                    self.train_func(task)
+
+            # evaluate improvement.
+            im = {}
+            for task in curr_tasks:
+                new_score = self.eval_func(task)
+                im[task] = new_score - self.task_score[task]
+                self.task_score[task] = new_score
+
+            # create candidate set.
+            new_tasks = tasks
+            if len(new_tasks) == 0:
+                print 'WARNING: new tasks is empty in GP'
+
+            # use Gaussian Process to estimate potential function.
+            N = len(im)
+            KXX = np.zeros((N, N))
+            y = np.zeros(N)
+            for (ti, (task_i, im_i)) in enumerate(im.items()):
+                for (tj, (task_j, im_j)) in enumerate(im.items()):
+                    KXX[ti, tj] = self.kernel_func(task_i, task_j)
+            for (ti, (task_i, im_i)) in enumerate(im.items()):
+                y[ti] = im_i
+
+            M = len(new_tasks)
+            KXsX = np.zeros((M, N))
+            KXsXs = np.zeros((M, M))
+            for (ti, task_i) in enumerate(new_tasks):
+                for (tj, (task_j, im_j)) in enumerate(im.items()):
+                    KXsX[ti, tj] = self.kernel_func(task_i, task_j)
+                KXsXs[ti, ti] = self.kernel_func(task_i, task_i)
+
+            KXXinv = npla.inv(KXX + self.sigma_n**2 * np.eye(N))
+
+            pred_mean = np.dot(KXsX, np.dot(KXXinv, y))
+            pred_cov = KXsXs - np.dot(KXsX, np.dot(KXXinv, np.transpose(KXsX)))
+            pred_sigma = np.sqrt(np.diag(pred_cov))
+
+            im_pred = {}
+            im_sigma = {}
+            im_ucb = {}
+            for (ti, task) in enumerate(new_tasks):
+                im_pred[task] = pred_mean[ti]
+                im_sigma[task] = pred_sigma[ti]
+                im_ucb[task] = pred_mean[ti] + self.eta * pred_sigma[ti]
+
+            new_tasks = sorted(new_tasks, key=lambda task: im_ucb[task], reverse=True)
+            new_tasks_selected = new_tasks[:K]
+
+            self.active_tasks = self.active_tasks.union(set(new_tasks_selected))
+
+            # collect diagnostics.
+            self.diagnostics['im'] = im
+            self.diagnostics['pred'] = im_pred
+            self.diagnostics['sigma'] = im_sigma
+            self.diagnostics['ucb'] = im_ucb
+            self.diagnostics['score'] = self.task_score
+            self.diagnostics['new-tasks'] = new_tasks
+            self.diagnostics['new-tasks-selected'] = new_tasks_selected
+            self.diagnostics['active-tasks'] = self.active_tasks
+
 class GPv1(object):
     '''
     an expert is a meta-feature, which is a function past-tasks and improvements.

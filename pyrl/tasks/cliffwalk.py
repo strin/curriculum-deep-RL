@@ -7,12 +7,13 @@ import matplotlib.pyplot as plt
 class CliffWalk(Task):
     actions = [0, 1]
 
-    def __init__(self, start_pos, size):
+    def __init__(self, start_pos, size, state_type=np.ndarray):
         self.state_1d = np.zeros(size)
         self.curr_pos = 0
         self.start_pos = start_pos
         self.size = size
         self.dead = False
+        self.state_type = state_type
         self.reset()
 
     def reset(self):
@@ -23,7 +24,10 @@ class CliffWalk(Task):
 
     @property
     def curr_state(self):
-        return np.array(self.state_1d)
+        if self.state_type == np.ndarray:
+            return np.array(self.state_1d)
+        else:
+            return self.curr_pos
 
     @property
     def num_states(self):
@@ -31,7 +35,10 @@ class CliffWalk(Task):
 
     @property
     def state_shape(self):
-        return self.state_1d.shape
+        if self.state_type == np.ndarray:
+            return self.state_1d.shape
+        else:
+            return 1
 
     @property
     def num_actions(self):

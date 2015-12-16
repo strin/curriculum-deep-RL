@@ -83,6 +83,173 @@ class ValueIterationSolver(object):
                 break
 
 
+class Qlearn(object):
+    def __init__(self, qfunc, gamma=0.95, alpha=1., epsilon=0.05):
+        self.qfunc = qfunc
+        self.gamma = gamma
+        self.alpha = alpha
+        self.epsilon = epsilon
+        self.total_exp = 0
+
+    def copy(self):
+        # copy dqn.
+        qfunc = self.qfunc.copy()
+        learner = Qlearn(qfunc, gamma=self.gamma, alpha=self.alpha, epsilon=self.epsilon)
+        learner.total_exp = self.total_exp
+        return learner
+
+    def run(self, task, num_episodes=100, tol=1e-4, budget=None):
+        '''
+        task: the task to run on.
+        num_episodes: how many episodes to repeat at maximum.
+        tol: tolerance in terms of reward signal.
+        budget: how many total steps to take.
+        '''
+        total_steps = 0.
+        for ei in range(num_episodes):
+            task.reset()
+
+            curr_state = task.curr_state
+
+            num_steps = 0.
+            while True:
+                # TODO: Hack!
+                if num_steps >= np.log(tol) / np.log(self.gamma):
+                    # print 'Lying and tell the agent the episode is over!'
+                    break
+
+                action = self.qfunc.get_action(curr_state, method='eps-greedy', epsilon=self.epsilon, valid_actions=task.valid_actions)
+                reward = task.step(action)
+                next_state = task.curr_state
+
+                num_steps += 1
+                total_steps += 1
+                self.total_exp += 1
+
+                self.qfunc.table[curr_state, action] *= (1 - self.alpha)
+                if task.is_end():
+                    self.qfunc.table[curr_state, action] += self.alpha * reward
+                    break
+                else:
+                    self.qfunc.table[curr_state, action] += self.alpha * (reward
+                                                + self.gamma * np.max(self.qfunc.table[next_state, :]))
+                    curr_state = next_state
+
+                if budget and num_steps >= budget:
+                    break
+        task.reset()
+
+
+class QlearnReplay(object):
+    '''
+    traditional Qlearning except with experience replay.
+    '''
+    def __init__(self, qfunc, gamma=0.95, alpha=1., epsilon=0.05, memory_size=1000, minibatch_size=512):
+        self.qfunc = qfunc
+        self.gamma = gamma
+        self.alpha = alpha
+        self.epsilon = epsilon
+        self.total_exp = 0
+
+        self.memory_size = memory_size
+        self.minibatch_size = minibatch_size
+        self.experience = []
+        self.exp_idx = 0
+
+        # used for streaming updates
+        self.last_state = None
+        self.last_action = None
+
+    def _add_to_experience(self, s, a, ns, r, nva):
+        # TODO: improve experience replay mechanism by making it harder to
+        # evict experiences with high td_error, for example
+        # s, ns are state_vectors.
+        # nva is a list of valid_actions at the next state.
+        self.total_exp += 1
+        if len(self.experience) < self.memory_size:
+            self.experience.append((s, a, ns, r, nva))
+        else:
+            self.experience[self.exp_idx] = (s, a, ns, r, nva)
+            self.exp_idx += 1
+            if self.exp_idx >= self.memory_size:
+                self.exp_idx = 0
+
+    def _end_episode(self, reward):
+        if self.last_state is not None:
+            self._add_to_experience(self.last_state, self.last_action, None,
+                                    reward, [])
+            # self._update_net()
+        self.last_state = None
+        self.last_action = None
+
+    def _learn(self, next_state, reward, next_valid_actions):
+        '''
+        need next_valid_actions to compute appropriate V = max_a Q(s', a).
+        '''
+        self._add_to_experience(self.last_state, self.last_action,
+                                next_state, reward, next_valid_actions)
+
+        samples = prob.choice(self.experience, self.minibatch_size, replace=True) # draw with replacement.
+
+        for idx, sample in enumerate(samples):
+            state, action, next_state, reward, nva = sample
+
+            self.qfunc.table[state, action] *= (1 - self.alpha)
+
+            if next_state is not None:
+                self.qfunc.table[state, action] += self.alpha * (reward
+                                            + self.gamma * np.max(self.qfunc.table[next_state, nva]))
+            else:
+                self.qfunc.table[state, action] += self.alpha * reward
+
+    def copy(self):
+        # copy dqn.
+        qfunc = self.qfunc.copy()
+        learner = Qlearn(qfunc, gamma=self.gamma, alpha=self.alpha, epsilon=self.epsilon)
+        learner.total_exp = self.total_exp
+        return learner
+
+    def run(self, task, num_episodes=100, tol=1e-4, budget=None):
+        '''
+        task: the task to run on.
+        num_episodes: how many episodes to repeat at maximum.
+        tol: tolerance in terms of reward signal.
+        budget: how many total steps to take.
+        '''
+        total_steps = 0.
+        for ei in range(num_episodes):
+            task.reset()
+
+            curr_state = task.curr_state
+
+            num_steps = 0.
+            while True:
+                # TODO: Hack!
+                if num_steps >= np.log(tol) / np.log(self.gamma):
+                    # print 'Lying and tell the agent the episode is over!'
+                    break
+
+                action = self.qfunc.get_action(curr_state, method='eps-greedy', epsilon=self.epsilon, valid_actions=task.valid_actions)
+                reward = task.step(action)
+                next_state = task.curr_state
+
+                self.last_state = curr_state
+                self.last_action = action
+
+                num_steps += 1
+                total_steps += 1
+
+                if task.is_end():
+                    self._end_episode(reward)
+                    break
+                else:
+                    self._learn(next_state, reward, task.valid_actions)
+                    curr_state = next_state
+
+                if budget and num_steps >= budget:
+                    break
+        task.reset()
+
 
 class DeepQlearn(object):
     '''

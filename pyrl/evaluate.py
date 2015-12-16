@@ -28,7 +28,7 @@ def reward_stochastic_samples(policy, task, gamma=0.95, num_trials = 100, budget
     task.reset()
     return total_reward
 
-def qval_stochastic_samples(dqn, task, gamma=0.95, num_trials = 100, budget=20, **args):
+def qval_stochastic_samples(policy, task, gamma=0.95, num_trials = 100, budget=20, **args):
     total_reward = []
 
     for ni in range(num_trials):
@@ -41,13 +41,43 @@ def qval_stochastic_samples(dqn, task, gamma=0.95, num_trials = 100, budget=20, 
                 break
 
             if num_steps >= budget:
-                action_values = dqn.fprop(np.array([task.curr_state]))[0]
+                action_values = policy.av(task.curr_state)
                 value = max([action_values[act] for act in task.valid_actions])
                 reward += factor * value
                 break
 
             curr_state = task.curr_state
             # action = policy.get_action(curr_state, method='eps-greedy', epsilon=0., valid_actions=task.valid_actions)
+            action = policy.get_action(curr_state, valid_actions=task.valid_actions, **args)
+            reward += factor * task.step(action)
+            factor *= gamma
+            num_steps += 1
+        total_reward.append(reward)
+    task.reset()
+    return total_reward
+
+def qval2_stochastic_samples(dqn, dqn2, task, gamma=0.95, num_trials = 100, budget=20, **args):
+    '''
+    use the value from dqn2 as bootstrap.
+    '''
+    total_reward = []
+
+    for ni in range(num_trials):
+        num_steps = 0
+        task.reset()
+        reward = 0.
+        factor = 1.
+        while True:
+            if task.is_end():
+                break
+
+            if num_steps >= budget:
+                action_values = dqn2.fprop(np.array([task.curr_state]))[0]
+                value = max([action_values[act] for act in task.valid_actions])
+                reward += factor * value
+                break
+
+            curr_state = task.curr_state
             action = dqn.get_action(curr_state, valid_actions=task.valid_actions, **args)
             reward += factor * task.step(action)
             factor *= gamma
@@ -62,6 +92,10 @@ def reward_stochastic(policy, task, gamma=0.95, num_trials=100, budget=None, tol
 
 def qval_stochastic(policy, task, gamma=0.95, num_trials=100, budget=20, **args):
     total_reward = qval_stochastic_samples(policy, task, gamma, num_trials, budget, **args)
+    return np.mean(total_reward)
+
+def qval2_stochastic(policy, policy2,task, gamma=0.95, num_trials=100, budget=20, **args):
+    total_reward = qval2_stochastic_samples(policy, policy2, task, gamma, num_trials, budget, **args)
     return np.mean(total_reward)
 
 def reward_stochastic_mean_std(policy, task, gamma=0.05, num_trials=100, tol=1e-6, **args):

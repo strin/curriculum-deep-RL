@@ -64,6 +64,10 @@ class Qfunc(object):
         action = self.get_action(state)
         return {action: 1.}
 
+    def copy(self):
+        import dill as pickle
+        return pickle.loads(pickle.dumps(self))
+
     def is_tabular(self):
         '''
         if True, then the Qfunc takes state_id as the state input.
@@ -71,6 +75,80 @@ class Qfunc(object):
         '''
         raise NotImplementedError()
 
+
+class QfuncTabular(Qfunc):
+    '''
+    a tabular representation of Q funciton.
+    '''
+    def __init__(self, num_states, num_actions):
+        self.num_states = num_states
+        self.num_actions = num_actions
+        self.table = np.zeros((num_states, num_actions))
+
+    def is_tabular(self):
+        return True
+
+    def __call__(self, state, action):
+        '''
+        given state (int), and action (int), output the Q value.
+        '''
+        assert(type(state) == int)
+        assert(type(action) == int)
+        return self.table[state, action]
+
+    def _get_eps_greedy_action_distribution(self, state, epsilon):
+        raise NotImplementedError()
+
+    def _get_eps_greedy_action(self, state, epsilon, valid_actions):
+        if(random.random() < epsilon):
+            action = npr.choice(valid_actions, 1)[0]
+        else:
+            # a^* = argmax_{a} Q(s, a)
+            vals = [self.table[state, a] for a in valid_actions]
+            max_poses = np.argwhere(vals == np.amax(vals)).reshape(-1)
+            action_i = npr.choice(max_poses, 1)
+            action = valid_actions[action_i]
+        return action
+
+    def _get_softmax_action_distribution(self, state, temperature, valid_actions=None):
+        if valid_actions == None:
+            valid_actions = range(self.num_actions)
+        qvals = self.table[state, valid_actions]
+        qvals = qvals / temperature
+        p = np.exp(prob.normalize_log(qvals))
+        return p
+
+    def _get_softmax_action(self, state, temperature, valid_actions):
+        probs = self._get_softmax_action_distribution(state, temperature, valid_actions)
+        return npr.choice(valid_actions, 1, replace=True, p=probs)[0]
+
+    def get_action(self, state, **kwargs):
+        if 'valid_actions' in kwargs:
+            valid_actions = kwargs['valid_actions']
+        else:
+            valid_actions = range(self.num_actions) # do not have a valid actions constraints.
+        if 'method' in kwargs:
+            method = kwargs['method']
+            if method == 'eps-greedy':
+                return self._get_eps_greedy_action(state, kwargs['epsilon'], valid_actions=valid_actions)
+            elif method == 'softmax':
+                return self._get_softmax_action(state, kwargs['temperature'], valid_actions=valid_actions)
+        else:
+            return self._get_eps_greedy_action(state, epsilon=0.05, valid_actions=valid_actions)
+
+    def get_action_distribution(self, state, **kwargs):
+        if 'method' in kwargs:
+            method = kwargs['method']
+            if method == 'eps-greedy':
+                log_probs = self._get_eps_greedy_action_distribution(state, kwargs['epsilon'])
+            elif method == 'softmax':
+                log_probs = self._get_softmax_action_distribution(state, kwargs['temperature'])
+        else: # default, 0.05-greedy policy.
+            log_probs = self._get_eps_greedy_action_distribution(state, epsilon=0.05)
+        return {action: log_probs[action] for action in range(self.num_actions)}
+
+    def av(self, state):
+        return self.table[state, :]
 
 class DQN(Qfunc):
     '''
@@ -85,10 +163,6 @@ class DQN(Qfunc):
         self.task = task
         self.state_type = state_type
         self._initialize_net()
-
-    def copy(self):
-        import dill as pickle
-        return pickle.loads(pickle.dumps(self))
 
     def is_tabular(self):
         return False
@@ -186,10 +260,12 @@ class DQN(Qfunc):
             log_probs = self._get_eps_greedy_action_distribution(state_vector, epsilon=0.05)
         return {action: log_probs[action] for action in range(self.task.num_actions)}
 
-
     def __call__(self, state_vector, action):
         actions = [action]
         return self.apply(state_vector.reshape(1, -1), actions)
+
+    def av(self, state):
+        return self.fprop(np.array([state]))[0]
 
 def compute_Qfunc_logprob(qfunc, task, softmax_t = 1.):
     '''

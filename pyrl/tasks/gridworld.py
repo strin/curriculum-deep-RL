@@ -19,7 +19,7 @@ class GridWorld(Task):
 
     actions = [N, E, W, S]
 
-    def __init__(self, grid, action_stoch, goal, rewards, wall_penalty):
+    def __init__(self, grid, action_stoch, goal, rewards, wall_penalty, state_type=np.ndarray):
         ''' grid is a 2D numpy array with 0 indicates where the agent
             can pass and 1 indicates an impermeable wall.
 
@@ -28,6 +28,7 @@ class GridWorld(Task):
             '''
         self.grid = grid
         self.action_stoch = action_stoch
+        self.state_type = state_type
         self.goal = dict(goal)
         self.free_pos = self._free_pos()
         self.curr_pos = random.choice(self.free_pos)
@@ -52,11 +53,11 @@ class GridWorld(Task):
         w, h = self.grid.shape
         for i in xrange(w):
             for j in xrange(h):
+                self.state_id[(i, j)] = state_num
                 if self.grid[i][j] == 0. and (i, j) not in self.goal:
                     pos.append((i, j))
-                    self.state_id[(i, j)] = state_num
-                    self.state_pos[state_num] = (i, j)
-                    state_num += 1
+                self.state_pos[state_num] = (i, j)
+                state_num += 1
         return pos
 
     def reset(self):
@@ -77,7 +78,17 @@ class GridWorld(Task):
         state is a 3xHxW tensor [state, goal, wall]
         should deep copy the state as it will go into the experience buffer.
         '''
-        return np.array(self.state_3d)
+        if self.state_type == np.ndarray:
+            return np.array(self.state_3d)
+        else:
+            return self.curr_state_id
+
+    @property
+    def curr_state_id(self):
+        '''
+        return the id of the state representation
+        '''
+        return self.state_id[self.curr_pos]
 
     @property
     def num_states(self):
@@ -163,9 +174,9 @@ class GridWorld(Task):
 
 
 class GridWorldFixedStart(GridWorld):
-    def __init__(self, start_pos, grid, action_stoch, goal, rewards, wall_penalty):
+    def __init__(self, start_pos, grid, action_stoch, goal, rewards, wall_penalty, state_type):
         self.start_pos = start_pos
-        GridWorld.__init__(self, grid, action_stoch, goal, rewards, wall_penalty)
+        GridWorld.__init__(self, grid, action_stoch, goal, rewards, wall_penalty, state_type)
         assert(start_pos in self.free_pos)
 
     def reset(self):
