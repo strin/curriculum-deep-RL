@@ -103,3 +103,15 @@ class Message(object):
         maybe_exc = "" if etype is None else " (with exception)"
         print colorize('\t'*MESSAGE_DEPTH + "done%s in %.3f seconds"%(maybe_exc, time.time() - self.tstart), 'magenta')
 
+def outdir_from_environ():
+    '''
+    parse experiment output dir from environment variables
+    create directory if necessary
+    '''
+    outdir = os.environ.get('outdir')
+    outdir = outdir if outdir else ''
+    if os.path.exists(outdir):
+        raise Exception('output directory already exists!')
+    mkdir_if_not_exist(outdir)
+    return outdir
+
