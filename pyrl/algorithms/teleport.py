@@ -553,6 +553,8 @@ class GPda(object):
         self.im_pred = {} # prediction of improvement per task.
         self.im_sigma = {} # uncertainty of improvement per task.
         self.im_ucb = {} # confidence upper bound.
+        self.im_mem = {} # task: [(t0, im0), (t1, im1), ...]
+        self.time = 0
 
         # some diagnostic statistics.
         self.diagnostics = {}
@@ -580,16 +582,20 @@ class GPda(object):
                     self.task_score[task] = self.eval_func(task)
 
             # learn on each task.
-            for it in range(1):
-                for task in active_tasks:
-                    self.train_func(task)
+            for task in active_tasks:
+                self.train_func(task)
 
             # evaluate improvement.
             im = {}
             for task in curr_tasks:
                 new_score = self.eval_func(task)
-                im[task] = new_score - self.task_score[task]
+                improvement = new_score - self.task_score[task]
                 self.task_score[task] = new_score
+                if task not in self.im_mem:
+                    self.im_mem[task] = []
+                self.im_mem[task].append((self.time, improvement))
+
+                im[task] = np.mean([i for (t, i) in self.im_mem[task] if self.time-t <= 3])
 
             # create candidate set.
             new_tasks = tasks
@@ -632,6 +638,8 @@ class GPda(object):
             new_tasks_selected = new_tasks[:K]
 
             self.active_tasks = self.active_tasks.union(set(new_tasks_selected))
+
+            self.time += 1
 
             # collect diagnostics.
             self.diagnostics['im'] = im
