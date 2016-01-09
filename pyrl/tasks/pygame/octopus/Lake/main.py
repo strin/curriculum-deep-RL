@@ -20,6 +20,7 @@ from pygame.locals import *
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 BLUE = (0, 100, 255)
+(SCREEN_WIDTH, SCREEN_HEIGHT) = (640, 480)
 clock = pygame.time.Clock()
 
 # this function loads an image from the data folder into pygame
@@ -683,16 +684,21 @@ def LoadLevel(name, screen, music, oldsky=("error.png")):
     return backgroundG, staticG, octopusG, colliderG, movingG, deathG, sounds, finish, music, sky, cut
 
 
+import base64
+import dill
+import numpy as np
+from pygame.event import Event
 
-
-
-
-
-
+try:
+    from pyrl.tasks.pygame.utils import AsyncEvent, SyncEvent
+    print 'succeeded in importing pygame utils'
+except ImportError:
+    raise ImportError('failed to import pygame utils')
 
 
 # the actual game code
-def Game(screen, level = 0):
+def Game(screen, event_gen = AsyncEvent(), level = 0):
+    # start game level.
     music = PlayMusic(None)
     skys = pygame.sprite.Group()
     Sky.containers = skys
@@ -711,9 +717,23 @@ def Game(screen, level = 0):
         except:
             levelOver = True
             gameOver = True
+
+        # mount handlers.
+        def get_state_dict():
+            state_dict = {}
+            for group in [staticG, octopusG, movingG]:
+                for sprite in group.sprites():
+                    if sprite.type not in state_dict:
+                        state_dict[sprite.type] = []
+                    state_dict[sprite.type].append((sprite.x, sprite.x+sprite.rect.w, sprite.y, sprite.y+sprite.rect.h))
+            return state_dict
+
+        event_gen.mount('state_dict', get_state_dict)
+
         while levelOver == False:
             #this handles all the events
-            for event in pygame.event.get():
+            for event in event_gen.get():
+                print 'event', event
                 if event.type == QUIT:
                     sys.exit()
                 if event.type == KEYDOWN:
@@ -894,28 +914,38 @@ def Game(screen, level = 0):
             skys.draw(screen)
             backgroundG.draw(screen)
             staticG.draw(screen)
-            deathG.draw(screen)
+            #deathG.draw(screen)
             movingG.draw(screen)
             octopusG.draw(screen)
-            colliderG.draw(screen)
+            #colliderG.draw(screen)
             pygame.display.update()
             clock.tick(60)
 
 
 def setup_screen():
     # this sets up the screen
-    screen = pygame.display.set_mode((640, 480), 0, 32)
+    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), 0, 32)
     pygame.display.set_caption('Mr Octopus!!!')
     pygame.display.set_icon(loadIm("icon.png"))
     screen.fill(BLUE)
+    return screen
+
+
+def start_game(event=AsyncEvent(), level=0):
+    pygame.init()
+    screen = setup_screen()
+
+    while True:
+        Game(screen, event, level)
 
 
 # This is the controller of the controllers
 def main(level=0):
     # initialise pygame
     pygame.init()
-    setup_screen()
+    screen = setup_screen()
 
     while True:
         # Menu(screen)
         Game(screen, level=level)
+
