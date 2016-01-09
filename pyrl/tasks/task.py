@@ -83,6 +83,10 @@ class Task:
         # returns reward.
         raise NotImplementedError()
 
+    @property
+    def state_shape(self):
+        return self.mdp.state_shape
+
 class MDPTask(Task):
     def __init__(self, mdp):
         self.mdp = mdp
