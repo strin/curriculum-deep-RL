@@ -4,7 +4,7 @@ from Lake.main import start_game, SyncEvent, AsyncEvent
 from threading import Thread
 
 level = os.environ.get('level')
-level = int(level) if level else 1
+level = int(level) if level and level.isdigit() else level
 event = os.environ.get('event')
 event = event if event else 'sync'
 

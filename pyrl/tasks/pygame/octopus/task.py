@@ -15,8 +15,9 @@ class OctopusTask(Task):
     DISPLAY_PYGAME = 1
 
     # path to game.
-    GAME_MODULE_PATH = os.path.abspath(pyrl.tasks.pygame.octopus.__file__)
-    GAME_PATH = os.path.join(os.path.dirname(GAME_MODULE_PATH), 'run_game.py')
+    GAME_MODULE_FILE = os.path.abspath(pyrl.tasks.pygame.octopus.__file__)
+    GAME_MODULE_PATH = os.path.dirname(GAME_MODULE_FILE)
+    GAME_PATH = os.path.join(GAME_MODULE_PATH, 'run_game.py')
 
     # all actions should be included in array `ACTIONS`.
     ACTIONS = [[pygame.K_UP],
@@ -31,18 +32,22 @@ class OctopusTask(Task):
     def __init__(self, level=1):
         self.level = level
         self.game_process = None
-        print 'GAME_PATH', OctopusTask.GAME_PATH
         self.reset()
 
 
     def reset(self):
-        if self.game_process and self.game_process.isalive():
-            self.game_process.terminate()
+        self.terminate()
+        os.environ['level'] = self.level
         self.game_process = pexpect.spawn('python %s' % OctopusTask.GAME_PATH, maxread=999999)
 
 
     def is_end(self):
         return not self.game_process.isalive()
+
+
+    def terminate(self):
+        if self.game_process and self.game_process.isalive():
+            self.game_process.terminate()
 
 
     @property
@@ -100,6 +105,20 @@ class OctopusTask(Task):
                 'event_type': pygame.KEYUP,
                 'key': event_key
             }))
+
+
+        self.game_process.sendline(encode_obj({
+            'type': 'go'
+        }))
+        self.game_process.expect('output>')
+
+        self.game_process.sendline(encode_obj({
+            'type': 'gameover'
+        }))
+        self.game_process.expect('output>')
+        gameover = decode_obj(self.game_process.readline())
+        return int(gameover)
+
 
     @property
     def state_shape(self):

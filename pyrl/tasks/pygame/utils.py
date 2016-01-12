@@ -34,6 +34,7 @@ class SyncEvent(object):
             yield event
 
         while sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
+        #while True: # loop until a GO event is emitted.
             raw_message = sys.stdin.readline()
             message = dill.loads(base64.b64decode(raw_message))
             print 'new message', message
@@ -43,7 +44,6 @@ class SyncEvent(object):
                 })
             elif message['type'] in self.mounted:
                 func = self.mounted[message['type']]
-                self.stdout.write('hello\n')
                 ret = func()
                 self.stdout.write('output>'+ encode_obj(ret) + '\r\n')
 

@@ -696,6 +696,8 @@ except ImportError:
     raise ImportError('failed to import pygame utils')
 
 
+GO_FLAG = [0] # how many times to update the screen before asking for next action.
+
 # the actual game code
 def Game(screen, event_gen = AsyncEvent(), level = 0):
     # start game level.
@@ -706,11 +708,18 @@ def Game(screen, event_gen = AsyncEvent(), level = 0):
     sky=Sky("Sky.png")
     while gameOver == False:
         levelOver = False
-        level += 1
+        levelRestart = [False]
+        if type(level) == int:
+            level += 1
+            level_path = os.path.join("Levels", str(level) + ".txt")
+        else:
+            level_path = os.path.join("Levels/", level + ".txt")
+        print 'level_path', level_path
+
         pygame.display.set_caption('Mr Octopus!!! Level ' + str(level))
         Sky.remove(sky)
         try:
-            backgroundG, staticG, octopusG, colliderG, movingG, deathG, sounds, finish, music, sky, cut = LoadLevel("Levels/" +str(level) + ".txt", screen, music=music, oldsky=sky)
+            backgroundG, staticG, octopusG, colliderG, movingG, deathG, sounds, finish, music, sky, cut = LoadLevel(level_path, screen, music=music, oldsky=sky)
             up = down = left = right = False
             water = False
             jumped = False
@@ -728,9 +737,20 @@ def Game(screen, event_gen = AsyncEvent(), level = 0):
                     state_dict[sprite.type].append((sprite.x, sprite.x+sprite.rect.w, sprite.y, sprite.y+sprite.rect.h))
             return state_dict
 
-        event_gen.mount('state_dict', get_state_dict)
+        def get_gameover():
+            if levelOver:
+                levelRestart[0] = True
+            return levelOver
 
-        while levelOver == False:
+        def ready_to_go():
+            GO_FLAG[0] = 100
+
+
+        event_gen.mount('state_dict', get_state_dict)
+        event_gen.mount('gameover', get_gameover)
+        event_gen.mount('go', ready_to_go)
+
+        while not levelRestart[0]:
             #this handles all the events
             for event in event_gen.get():
                 print 'event', event
@@ -767,8 +787,16 @@ def Game(screen, event_gen = AsyncEvent(), level = 0):
                     elif event.key == K_RIGHT:
                         right = False
 
+            if GO_FLAG[0] == 0: # do not simulate, just update screen to avoid blocking.
+                pygame.display.update()
+                continue
+            else:
+                GO_FLAG[0] -= 1
+
+
             for item in octopusG:
                 water = False
+                # print item.x, ',', item.y
                 # slow down in water
                 for staticitem in staticG:
                     if item.rect.colliderect(staticitem.rect):
@@ -919,7 +947,6 @@ def Game(screen, event_gen = AsyncEvent(), level = 0):
             octopusG.draw(screen)
             #colliderG.draw(screen)
             pygame.display.update()
-            clock.tick(60)
 
 
 def setup_screen():
