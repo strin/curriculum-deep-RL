@@ -2,6 +2,7 @@ import numpy.random as npr
 import numpy as np
 import time
 import os
+import sys
 
 def make_minibatch_x(data, batch_size, num_iter):
     '''
@@ -53,17 +54,23 @@ def mkdir_if_not_exist(path):
 
 
 class Timer(object):
-    def __init__(self, name=None):
+    def __init__(self, name=None, output=sys.stdout):
         self.name = name
+        if output and type(output) == str:
+            self.output = open(output, 'w')
+        else:
+            self.output = output
 
     def __enter__(self):
-        print '[%s]' % self.name, 'Start'
+        print >>self.output, '[%s]' % self.name, 'Start'
         self.tstart = time.time()
+        self.output.flush()
 
     def __exit__(self, type, value, traceback):
         if self.name:
-            print '[%s]' % self.name,
-        print 'Elapsed: %s' % (time.time() - self.tstart)
+            print >>self.output, '[%s]' % self.name,
+        print >>self.output, 'Elapsed: %s' % (time.time() - self.tstart)
+        self.output.flush()
 
 
 color2num = dict(

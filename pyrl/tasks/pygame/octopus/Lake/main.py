@@ -706,7 +706,7 @@ def Game(screen, event_gen = AsyncEvent(), level = 0):
     Sky.containers = skys
     gameOver = False
     sky=Sky("Sky.png")
-    while gameOver == False:
+    if gameOver == False:
         levelOver = False
         levelRestart = [False]
         if type(level) == int:
@@ -962,8 +962,8 @@ def start_game(event=AsyncEvent(), level=0):
     pygame.init()
     screen = setup_screen()
 
-    while True:
-        Game(screen, event, level)
+    #while True:
+    Game(screen, event, level)
 
 
 # This is the controller of the controllers
@@ -972,7 +972,7 @@ def main(level=0):
     pygame.init()
     screen = setup_screen()
 
-    while True:
+    #while True:
         # Menu(screen)
-        Game(screen, level=level)
+    Game(screen, level=level)
 

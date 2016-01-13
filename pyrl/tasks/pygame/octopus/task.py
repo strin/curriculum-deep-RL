@@ -6,8 +6,11 @@ import pygame
 import os
 import pexpect
 import numpy as np
+import numpy.random as npr
+
 from skimage.transform import resize
 from skimage.filters import gaussian_filter
+
 
 
 class OctopusTask(Task):
@@ -91,38 +94,67 @@ class OctopusTask(Task):
 
     def step(self, action):
         assert(action >= 0 and action < self.num_actions)
-        for event_key in OctopusTask.ACTIONS[action]:
+        try:
+            for event_key in OctopusTask.ACTIONS[action]:
+                self.game_process.sendline(encode_obj({
+                    'type': 'event',
+                    'event_type': pygame.KEYDOWN,
+                    'key': event_key
+                }))
+            clock = pygame.time.Clock()
+            clock.tick(60)
+            for event_key in OctopusTask.ACTIONS[action]:
+                self.game_process.sendline(encode_obj({
+                    'type': 'event',
+                    'event_type': pygame.KEYUP,
+                    'key': event_key
+                }))
+
+
             self.game_process.sendline(encode_obj({
-                'type': 'event',
-                'event_type': pygame.KEYDOWN,
-                'key': event_key
+                'type': 'go'
             }))
-        clock = pygame.time.Clock()
-        clock.tick(60)
-        for event_key in OctopusTask.ACTIONS[action]:
+            self.game_process.expect('output>')
+
             self.game_process.sendline(encode_obj({
-                'type': 'event',
-                'event_type': pygame.KEYUP,
-                'key': event_key
+                'type': 'gameover'
             }))
-
-
-        self.game_process.sendline(encode_obj({
-            'type': 'go'
-        }))
-        self.game_process.expect('output>')
-
-        self.game_process.sendline(encode_obj({
-            'type': 'gameover'
-        }))
-        self.game_process.expect('output>')
-        gameover = decode_obj(self.game_process.readline())
-        return int(gameover)
+            self.game_process.expect('output>')
+            gameover = decode_obj(self.game_process.readline())
+            return int(gameover)
+        except:
+            return 0.
 
 
     @property
     def state_shape(self):
         return self.curr_state.shape
+
+
+    @property
+    def visualize(self, state):
+        '''
+        visualize the state as a static image.
+        '''
+        image = np.zeros((state.shape[1], state.shape[2], 3))
+
+        for dim in range(state.shape[0]):
+            color = [npr.randint(0, 255),
+                     npr.randint(0, 255),
+                     npr.randint(0, 255)]
+            for ci in range(3):
+                image[:, :, ci] += color[ci] * state[dim, :, :] / float(state.shape[0])
+
+        image = image / np.max(image) * 255
+        image = np.vectorize(uint8)(image)
+
+        import matplotlib.pyplot as plt
+        return plt.imshow(image)
+
+
+
+
+
 
 
 
