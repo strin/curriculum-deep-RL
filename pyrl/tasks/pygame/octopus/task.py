@@ -33,6 +33,7 @@ class OctopusTask(Task):
 
 
     def __init__(self, level=1):
+        self.colors = {}
         self.level = level
         self.game_process = None
         self.reset()
@@ -60,7 +61,6 @@ class OctopusTask(Task):
         }))
         self.game_process.expect('output>')
         raw_data = self.game_process.readline()
-        print 'raw_data', raw_data
         state_dict_embed = decode_obj(raw_data)
         # create state_matrix from state_dict.
         state_dict = {}
@@ -76,6 +76,8 @@ class OctopusTask(Task):
             filter_sigma = np.sqrt((SCREEN_HEIGHT / MAP_SIZE) ** 2 + (SCREEN_WIDTH / MAP_SIZE) ** 2)
             filtered = gaussian_filter(state_dict[key], sigma=filter_sigma)
             resized = resize(filtered, (32, 32), preserve_range=True)
+            # normalize so that each channel has same strength.
+            resized = resized / (1e-4 + np.max(resized))
             state_dict[key] = resized
             # add to feature representation.
             state_stack.append(state_dict[key])
@@ -131,25 +133,36 @@ class OctopusTask(Task):
         return self.curr_state.shape
 
 
-    @property
-    def visualize(self, state):
+    def visualize(self, state, fname=None):
         '''
         visualize the state as a static image.
         '''
+        import matplotlib.pyplot as plt
+
         image = np.zeros((state.shape[1], state.shape[2], 3))
 
         for dim in range(state.shape[0]):
-            color = [npr.randint(0, 255),
-                     npr.randint(0, 255),
-                     npr.randint(0, 255)]
+            if dim in self.colors:
+                color = self.colors[dim]
+            else:
+                color = [npr.randint(0, 255),
+                        npr.randint(0, 255),
+                        npr.randint(0, 255)]
+                self.colors[dim] = color
             for ci in range(3):
                 image[:, :, ci] += color[ci] * state[dim, :, :] / float(state.shape[0])
 
-        image = image / np.max(image) * 255
-        image = np.vectorize(uint8)(image)
+        image = image / (1e-4 + np.max(image)) * 255
+        image = np.vectorize(np.uint8)(image)
 
-        import matplotlib.pyplot as plt
-        return plt.imshow(image)
+        plt.figure(0)
+        fig = plt.imshow(image, interpolation='none')
+
+        if fname:
+            plt.savefig(fname)
+        else:
+            plt.show()
+
 
 
 

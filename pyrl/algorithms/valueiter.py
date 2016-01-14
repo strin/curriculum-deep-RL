@@ -408,7 +408,7 @@ class DeepQlearn(object):
         self.last_state = None
         self.last_action = None
 
-    def run(self, task, num_episodes=100, tol=1e-4, budget=None):
+    def run(self, task, num_episodes=100, tol=1e-4, budget=None, callback=None):
         '''
         task: the task to run on.
         num_episodes: how many episodes to repeat at maximum.
@@ -434,12 +434,22 @@ class DeepQlearn(object):
                 self.last_action = action
 
                 reward = task.step(action)
-                next_state = task.curr_state
+
+                try:
+                    next_state = task.curr_state
+                    has_next_state = True
+                except: # sessin has ended.
+                    next_state = None
+                    has_next_state = False
 
                 num_steps += 1
                 total_steps += 1
 
-                if task.is_end():
+                # call diagnostics callback if provided.
+                if callback:
+                    callback(curr_state, action, next_state, reward)
+
+                if task.is_end() or not has_next_state:
                     self._end_episode(reward)
                     break
                 else:
