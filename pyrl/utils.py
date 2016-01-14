@@ -49,6 +49,8 @@ def train_test_split(dataset, training_ratio = 0.6):
     return (train_set, test_set)
 
 def mkdir_if_not_exist(path):
+    if path == '':
+        return
     if not os.path.exists(path):
         os.makedirs(path)
 

@@ -36,12 +36,16 @@ class OctopusTask(Task):
         self.colors = {}
         self.level = level
         self.game_process = None
+
+        self.num_reset = 0
         self.reset()
 
 
     def reset(self):
         self.terminate()
+        self.num_reset += 1
         os.environ['level'] = self.level
+        os.environ['video'] = 'video/' + str(self.level) + '/%d' % self.num_reset + '.mp4'
         self.game_process = pexpect.spawn('python %s' % OctopusTask.GAME_PATH, maxread=999999)
 
 

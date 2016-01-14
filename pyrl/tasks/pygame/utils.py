@@ -1,11 +1,19 @@
 # shared utils for pygames.
+from pyrl.utils import mkdir_if_not_exist
+
+import os
 import pygame
+import pygame.image
 from pygame.event import Event
-from multiprocessing import Queue
+
+import threading
 import dill
 import base64
 import sys
 import select
+import subprocess
+import time
+import pexpect
 
 
 class AsyncEvent(object):
@@ -14,6 +22,9 @@ class AsyncEvent(object):
     '''
     def get(self):
         return pygame.event.get()
+
+    def mount(self, message_type, func):
+        pass # ignore.
 
 
 class SyncEvent(object):
@@ -76,4 +87,41 @@ def decode_obj(obj):
 
 
 
+class VideoRecorder(object):
+    '''
+    record a video from pygame session.
+    requires ffmpeg.
+    '''
+    FFMPEG_BIN = 'ffmpeg'
+
+    def __init__(self, surface, fname):
+        screen_size = (surface.get_width(), surface.get_height())
+
+        mkdir_if_not_exist(os.path.dirname(fname))
+        command = [ VideoRecorder.FFMPEG_BIN,
+            '-y', # (optional) overwrite output file if it exists
+            '-f', 'rawvideo',
+            '-vcodec','rawvideo',
+            '-s', '%sx%s' % (screen_size[0], screen_size[1]), # size of one frame
+            '-pix_fmt', 'rgb24',
+            '-r', '24', # frames per second
+            '-i', '-', # The input comes from a pipe
+            '-an', # Tells FFMPEG not to expect any audio
+            '-vcodec', 'mpeg4',
+            fname ]
+
+        movie = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=None)
+
+        self.surface = surface
+        self.movie = movie
+
+        thread = threading.Thread(target=self.record)
+        thread.start()
+
+
+    def record(self):
+        while True:
+            data = pygame.image.tostring(self.surface, 'RGB')
+            self.movie.stdin.write(data)
+            time.sleep(1. / 24)
 

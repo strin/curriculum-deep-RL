@@ -789,7 +789,7 @@ def Game(screen, event_gen = AsyncEvent(), level = 0):
 
             if GO_FLAG[0] == 0: # do not simulate, just update screen to avoid blocking.
                 pygame.display.update()
-                continue
+                #continue
             else:
                 GO_FLAG[0] -= 1
 
@@ -963,16 +963,11 @@ def start_game(event=AsyncEvent(), level=0):
     screen = setup_screen()
 
     #while True:
+    if 'video' in os.environ:
+        video_fname = os.environ['video']
+        from pyrl.tasks.pygame.utils import VideoRecorder
+        recorder = VideoRecorder(screen, video_fname)
+
     Game(screen, event, level)
 
-
-# This is the controller of the controllers
-def main(level=0):
-    # initialise pygame
-    pygame.init()
-    screen = setup_screen()
-
-    #while True:
-        # Menu(screen)
-    Game(screen, level=level)
 
