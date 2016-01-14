@@ -962,11 +962,11 @@ def start_game(event=AsyncEvent(), level=0):
     pygame.init()
     screen = setup_screen()
 
-    #while True:
-    if 'video' in os.environ:
-        video_fname = os.environ['video']
-        from pyrl.tasks.pygame.utils import VideoRecorder
-        recorder = VideoRecorder(screen, video_fname)
+    ##while True:
+    #if 'video' in os.environ:
+    #    video_fname = os.environ['video']
+    #    from pyrl.tasks.pygame.utils import VideoRecorder
+    #    recorder = VideoRecorder(screen, video_fname)
 
     Game(screen, event, level)
 

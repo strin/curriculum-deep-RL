@@ -114,14 +114,19 @@ class VideoRecorder(object):
 
         self.surface = surface
         self.movie = movie
+        self.running = True
 
         thread = threading.Thread(target=self.record)
         thread.start()
 
 
     def record(self):
-        while True:
+        while self.running:
             data = pygame.image.tostring(self.surface, 'RGB')
             self.movie.stdin.write(data)
             time.sleep(1. / 24)
+
+
+    def stop(self):
+        self.running = False
 
