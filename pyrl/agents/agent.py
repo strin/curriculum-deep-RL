@@ -160,7 +160,7 @@ class DQN(Qfunc):
         epsilon: probability for taking a greedy action.
         '''
         self.arch_func = arch_func
-        self.task = task
+        self.num_actions = task.num_actions
         self.state_type = state_type
         self._initialize_net()
 
@@ -201,7 +201,7 @@ class DQN(Qfunc):
         state_vector = state_vector.reshape(1, -1)
 
         # uniform distribution.
-        probs = [epsilon / self.task.num_actions] * self.task.num_actions
+        probs = [epsilon / self.num_actions] * self.num_actions
 
         # increase probability at greedy action..
         action = np.argmax(self.fprop(state_vector))
@@ -224,7 +224,7 @@ class DQN(Qfunc):
 
     def _get_softmax_action_distribution(self, state, temperature, valid_actions=None):
         if valid_actions == None:
-            valid_actions = range(self.task.num_actions)
+            valid_actions = range(self.num_actions)
         state = state.reshape(1, *state.shape)
         qvals = self.fprop(state).reshape(-1)[valid_actions]
         qvals = qvals / temperature
@@ -239,7 +239,7 @@ class DQN(Qfunc):
         if 'valid_actions' in kwargs:
             valid_actions = kwargs['valid_actions']
         else:
-            valid_actions = range(self.task.num_actions) # do not have a valid actions constraints.
+            valid_actions = range(self.num_actions) # do not have a valid actions constraints.
         if 'method' in kwargs:
             method = kwargs['method']
             if method == 'eps-greedy':
@@ -258,7 +258,7 @@ class DQN(Qfunc):
                 log_probs = self._get_softmax_action_distribution(state_vector, kwargs['temperature'])
         else: # default, 0.05-greedy policy.
             log_probs = self._get_eps_greedy_action_distribution(state_vector, epsilon=0.05)
-        return {action: log_probs[action] for action in range(self.task.num_actions)}
+        return {action: log_probs[action] for action in range(self.num_actions)}
 
     def __call__(self, state_vector, action):
         actions = [action]

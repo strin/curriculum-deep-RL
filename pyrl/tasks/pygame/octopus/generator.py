@@ -44,7 +44,7 @@ class OctopusGenerator(Generator):
         return data
 
 
-    def sample(self):
+    def sample(self, **kwargs):
         if self.coord_data:
             (_, octopus_x, octopus_y) = prob.choice(self.coord_data, 1)[0]
         else:
@@ -59,6 +59,6 @@ class OctopusGenerator(Generator):
                     f.write(','.join([obj, str(octopus_x), str(octopus_y)]) + '\n')
                 else:
                     f.write(','.join([obj, str(x), str(y)]) + '\n')
-        return OctopusTask(level=task_id)
+        return OctopusTask(level=task_id, **kwargs)
 
 

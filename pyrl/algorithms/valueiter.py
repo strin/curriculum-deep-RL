@@ -256,7 +256,8 @@ class DeepQlearn(object):
     DeepMind's deep Q learning algorithms.
     '''
     def __init__(self, dqn_mt, gamma=0.95, l2_reg=0.0, lr=1e-3,
-               memory_size=250, minibatch_size=64, epsilon=0.05):
+               memory_size=250, minibatch_size=64, epsilon=0.05,
+               nn_num_batch=1, nn_num_iter=2):
         '''
         (TODO): task should be task info.
         we don't use all of task properties/methods here.
@@ -279,6 +280,10 @@ class DeepQlearn(object):
         # used for streaming updates
         self.last_state = None
         self.last_action = None
+
+        # params for nn optimization.
+        self.nn_num_batch = nn_num_batch
+        self.nn_num_iter = nn_num_iter
 
         # compile back-propagtion network
         self._compile_bp()
@@ -343,54 +348,55 @@ class DeepQlearn(object):
         # removing this might cause correlation for early samples. suggested to be used in curriculums.
         #if len(self.experience) < self.memory_size:
         #    return
+        for nn_bi in range(self.nn_num_batch):
+            states = [None] * self.minibatch_size
+            next_states = [None] * self.minibatch_size
+            actions = np.zeros(self.minibatch_size, dtype=int)
+            rewards = np.zeros(self.minibatch_size)
+            nvas = []
 
-        states = [None] * self.minibatch_size
-        next_states = [None] * self.minibatch_size
-        actions = np.zeros(self.minibatch_size, dtype=int)
-        rewards = np.zeros(self.minibatch_size)
-        nvas = []
+            # sample and process minibatch
+            # samples = random.sample(self.experience, self.minibatch_size) # draw without replacement.
+            samples = prob.choice(self.experience, self.minibatch_size, replace=True) # draw with replacement.
+            terminals = []
+            for idx, sample in enumerate(samples):
+                state, action, next_state, reward, nva = sample
 
-        # sample and process minibatch
-        # samples = random.sample(self.experience, self.minibatch_size) # draw without replacement.
-        samples = prob.choice(self.experience, self.minibatch_size, replace=True) # draw with replacement.
-        terminals = []
-        for idx, sample in enumerate(samples):
-            state, action, next_state, reward, nva = sample
+                states[idx] = state
+                actions[idx] = action
+                rewards[idx] = reward
+                nvas.append(nva)
 
-            states[idx] = state
-            actions[idx] = action
-            rewards[idx] = reward
-            nvas.append(nva)
+                if next_state is not None:
+                    next_states[idx] = next_state
+                else:
+                    next_states[idx] = state
+                    terminals.append(idx)
 
-            if next_state is not None:
-                next_states[idx] = next_state
-            else:
-                next_states[idx] = state
-                terminals.append(idx)
+            # convert states into tensor.
+            states = np.array(states)
+            next_states = np.array(next_states)
 
-        # convert states into tensor.
-        states = np.array(states)
-        next_states = np.array(next_states)
+            # compute target reward + \gamma max_{a'} Q(ns, a')
+            # Ensure target = reward when NEXT_STATE is terminal
+            next_qvals = self.dqn.fprop(next_states)
+            next_vs = np.zeros(self.minibatch_size)
+            for idx in range(self.minibatch_size):
+                if idx not in terminals:
+                    next_vs[idx] = np.max(next_qvals[idx, nvas[idx]])
 
-        # compute target reward + \gamma max_{a'} Q(ns, a')
-        # Ensure target = reward when NEXT_STATE is terminal
-        next_qvals = self.dqn.fprop(next_states)
-        next_vs = np.zeros(self.minibatch_size)
-        for idx in range(self.minibatch_size):
-            if idx not in terminals:
-                next_vs[idx] = np.max(next_qvals[idx, nvas[idx]])
+            targets = rewards + self.gamma * next_vs
 
-        targets = rewards + self.gamma * next_vs
-
-        ## diagnostics.
-        #print 'targets', targets
-        #print 'next_qvals', next_qvals
-        #print 'pure prop', self.dqn.fprop(states)
-        #print 'prop', self.dqn.fprop(states)[range(states.shape[0]), actions]
-        #print 'actions', actions
-        #for it in range(10):
-        error = self.bprop(states, actions, targets.flatten())
-        #print 'error', error
+            ## diagnostics.
+            #print 'targets', targets
+            #print 'next_qvals', next_qvals
+            #print 'pure prop', self.dqn.fprop(states)
+            #print 'prop', self.dqn.fprop(states)[range(states.shape[0]), actions]
+            #print 'actions', actions
+            for nn_it in range(self.nn_num_iter):
+                error = self.bprop(states, actions, targets.flatten())
+                print 'nn optimize [error]', error
+            print
 
     def _learn(self, next_state, reward, next_valid_actions):
         '''

@@ -1,4 +1,5 @@
 from pyrl.tasks.task import Task
+from pyrl.utils import mkdir_if_not_exist
 from pyrl.tasks.pygame.utils import AsyncEvent, SyncEvent, encode_obj, decode_obj
 from pyrl.tasks.pygame.octopus.Lake.main import setup_screen, Game, start_game, SCREEN_WIDTH, SCREEN_HEIGHT
 import pyrl.tasks.pygame.octopus
@@ -32,7 +33,9 @@ class OctopusTask(Task):
                []] # None -> no action.
 
 
-    def __init__(self, level=1):
+    def __init__(self, level=1, video_path=None):
+        self.video_path = video_path
+
         self.colors = {}
         self.level = level
         self.game_process = None
@@ -41,11 +44,14 @@ class OctopusTask(Task):
         self.reset()
 
 
+
     def reset(self):
         self.terminate()
         self.num_reset += 1
         os.environ['level'] = self.level
-        os.environ['video'] = 'video/' + str(self.level) + '/%d' % self.num_reset + '.mp4'
+        if self.video_path:
+            mkdir_if_not_exist(self.video_path)
+            os.environ['video'] = self.video_path + '/%d' % self.num_reset + '.mp4'
         self.game_process = pexpect.spawn('python %s' % OctopusTask.GAME_PATH, maxread=999999)
 
 
