@@ -4,6 +4,9 @@ import time
 import os
 import sys
 
+from StringIO import StringIO
+from pprint import pprint
+
 def make_minibatch_x(data, batch_size, num_iter):
     '''
     assume data is a N x D matrix, this method creates mini-batches
@@ -123,4 +126,16 @@ def outdir_from_environ():
         raise Exception('output directory already exists!')
     mkdir_if_not_exist(outdir)
     return outdir
+
+
+def to_string(obj):
+    if type(obj) == dict:
+       buf = StringIO()
+       pprint(obj, buf)
+       buf.seek(0)
+       res = buf.read()
+       buf.close()
+       return res
+    else:
+        raise TypeError('Unsupported type %s for to_string' % str(type(obj)))
 
