@@ -142,7 +142,8 @@ class GridWorld(Task):
         if self.curr_pos in self.goal:
             self.state_3d[1, self.curr_pos[0], self.curr_pos[1]] = 0.
             reward = float(self.rewards[self.curr_pos])
-            del self.goal[self.curr_pos]
+            if self.goal != self.rewards:
+                del self.goal[self.curr_pos]
             del self.rewards[self.curr_pos]
 
         return reward
@@ -188,3 +189,48 @@ class GridWorldFixedStart(GridWorld):
     def __repr__(self):
         return str(self.start_pos) + ' -> ' + ','.join([str(key) for key in self.goal.keys()])
 
+
+class GridWorldMultiGoal(GridWorld):
+    '''
+    A GridWorld task where the agent is asked to visit a sequence of tasks.
+    A reward 1. is given only if the agent visited the goals in correct order and got to the last one.
+    '''
+    def __init__(self, start_pos, start_phase, grid, action_stoch, goals, wall_penalty=0.):
+        self.start_pos = start_pos
+        self.start_phase = start_phase
+        self.goals = goals
+        assert(start_phase >= 0 and start_phase < len(goals))
+        self.goal_tuple = goals[start_phase]
+        self.phase = self.start_phase
+
+        GridWorld.__init__(self, grid, action_stoch,
+                {self.goal_tuple: 1.0}, rewards={self.goal_tuple: 1.},
+                wall_penalty=wall_penalty, state_type=np.ndarray)
+
+        assert(start_pos in self.free_pos)
+
+    def reset(self):
+        self.goal_tuple = self.goals[self.start_phase]
+        self.phase = self.start_phase
+        GridWorld.reset(self)
+        self.state_3d[0, self.curr_pos[0], self.curr_pos[1]] = 0.
+        self.curr_pos = self.start_pos
+        self.state_3d[0, self.curr_pos[0], self.curr_pos[1]] = 1.
+
+    def step(self, action):
+        local_reward = GridWorld.step(self, action)
+        if local_reward == 1.: # get to a goal.
+            if self.phase == len(self.goals) - 1:
+                return 1.
+            else:
+                self.state_3d[1, self.goal_tuple[0], self.goal_tuple[1]] = 0.
+                self.phase += 1
+                self.goal_tuple = self.goals[self.phase]
+                self.goal = {self.goal_tuple: 1.}
+                self.rewards = self.goal
+                self.state_3d[1, self.goal_tuple[0], self.goal_tuple[1]] = 1.
+        return 0.
+
+    def visualize(self):
+        GridWorld.visualize(self)
+        print 'phase = ', self.phase
