@@ -155,12 +155,12 @@ class DQN(Qfunc):
     A deep Q function that uses theano.
     TODO: dependence on task is only on task.num_actions.
     '''
-    def __init__(self, task, arch_func, state_type=T.matrix):
+    def __init__(self, num_actions, arch_func, state_type=T.matrix):
         '''
         epsilon: probability for taking a greedy action.
         '''
         self.arch_func = arch_func
-        self.num_actions = task.num_actions
+        self.num_actions = num_actions
         self.state_type = state_type
         self._initialize_net()
 
