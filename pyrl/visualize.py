@@ -62,7 +62,7 @@ class VideoRecorder(object):
             '-vcodec', 'mjpeg',
             '-r', '30', # frames per second
             '-i', '-', # The input comes from a pipe
-            '-vcodec', 'mpeg4',
+            '-vcodec', 'libx264',
             '-an', # Tells FFMPEG not to expect any audio
             fname ]
 
@@ -89,3 +89,10 @@ def html_embed_mp4(video_path):
     video = open(video_path, "rb").read()
     _encoded_video = video.encode("base64")
     return VIDEO_TAG.format(_encoded_video)
+
+def html_mp4(video_path):
+    VIDEO_TAG = """<video controls>
+     <source src="{0}" type="video/mp4">
+     Your browser does not support the video tag.
+    </video>"""
+    return VIDEO_TAG.format(video_path)

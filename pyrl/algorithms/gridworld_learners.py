@@ -219,9 +219,6 @@ class DeepQMultigoal(object):
                 reward = task.step(action)
                 avg_reward += reward / float(num_episodes)
 
-                if reward > 0:
-                    print 'phase', task.phase
-
                 try:
                     next_state = task.curr_state
                     has_next_state = True
@@ -236,13 +233,14 @@ class DeepQMultigoal(object):
                 if callback:
                     callback(curr_state, action, next_state, reward)
 
-                if not test:
-                    if task.is_end() or not has_next_state:
+                if task.is_end() or not has_next_state:
+                    if not test:
                         self._end_episode(reward)
-                        break
-                    else:
+                    break
+                else:
+                    if not test:
                         self._learn(task.phase, next_state, reward, task.valid_actions)
-                        curr_state = next_state
+                    curr_state = next_state
 
                 if budget and num_steps >= budget:
                     break
