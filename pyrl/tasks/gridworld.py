@@ -142,7 +142,7 @@ class GridWorld(Task):
         if self.curr_pos in self.goal:
             self.state_3d[1, self.curr_pos[0], self.curr_pos[1]] = 0.
             reward = float(self.rewards[self.curr_pos])
-            if self.goal != self.rewards:
+            if id(self.goal) != id(self.rewards):
                 del self.goal[self.curr_pos]
             del self.rewards[self.curr_pos]
 
@@ -151,8 +151,8 @@ class GridWorld(Task):
     def is_end(self):
         return len(self.goal) == 0
 
-    def visualize(self, fname = None):
-        fig = plt.figure(1, figsize=(5,5))
+    def visualize(self, fig = 1, fname = None, format='png'):
+        fig = plt.figure(fig, figsize=(5,5))
         plt.clf()
         ax = fig.add_axes([0.0, 0.0, 1., 1.])
         plt.imshow(np.transpose(self.grid), interpolation='none', vmax=1.0, vmin=0.0, aspect='auto')
@@ -165,13 +165,14 @@ class GridWorld(Task):
         y /= float(self.grid.shape[0])
         axicon = fig.add_axes([x, y, 1. / self.grid.shape[1], 1. / self.grid.shape[0]])
         im = plt.imread(__file__[:__file__.rfind('/')] + '/pacman.png')
-        axicon.imshow(im, interpolation='nearest')
+        res = axicon.imshow(im, interpolation='nearest')
         axicon.axis('off')
         ax.axis('off')
         if fname:
-            plt.savefig(fname)
+            plt.savefig(fname, format=format)
         else:
             plt.show()
+        return res
 
 
 class GridWorldFixedStart(GridWorld):
@@ -231,6 +232,12 @@ class GridWorldMultiGoal(GridWorld):
                 self.state_3d[1, self.goal_tuple[0], self.goal_tuple[1]] = 1.
         return 0.
 
-    def visualize(self):
-        GridWorld.visualize(self)
-        print 'phase = ', self.phase
+    def visualize(self, fig=1, fname=None, format='png'):
+        if fname == None:
+            print 'phase = ', self.phase
+        return GridWorld.visualize(self, fig=fig, fname=fname, format=format)
+
+    @property
+    def num_phases(self):
+        return len(self.goals)
+

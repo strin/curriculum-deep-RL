@@ -285,6 +285,11 @@ class DeepQlearn(object):
         self.nn_num_batch = nn_num_batch
         self.nn_num_iter = nn_num_iter
 
+        # dianostics.
+        self.diagnostics = {
+            'nn-error': [] # training of neural network on mini-batches.
+        }
+
         # compile back-propagtion network
         self._compile_bp()
 
@@ -393,10 +398,11 @@ class DeepQlearn(object):
             #print 'pure prop', self.dqn.fprop(states)
             #print 'prop', self.dqn.fprop(states)[range(states.shape[0]), actions]
             #print 'actions', actions
+            nn_error = []
             for nn_it in range(self.nn_num_iter):
                 error = self.bprop(states, actions, targets.flatten())
-                print 'nn optimize [error]', error
-            print
+                nn_error.append(float(error))
+            self.diagnostics['nn-error'].append(nn_error)
 
     def _learn(self, next_state, reward, next_valid_actions):
         '''

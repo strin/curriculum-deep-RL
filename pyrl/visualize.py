@@ -1,7 +1,9 @@
 import numpy as np
 import numpy.random as npr
 import time
+import os
 from os import path
+import subprocess
 from pyrl.tasks.task import Task
 from pyrl.algorithms.valueiter import compute_tabular_value
 from pyrl.utils import mkdir_if_not_exist
@@ -45,3 +47,45 @@ def replay_game(output_path):
         time.sleep(0.1)
 
 
+class VideoRecorder(object):
+    '''
+    record a video from pygame session.
+    requires ffmpeg.
+    '''
+    FFMPEG_BIN = 'ffmpeg'
+
+    def __init__(self, fname):
+        mkdir_if_not_exist(os.path.dirname(fname))
+        command = [ VideoRecorder.FFMPEG_BIN,
+            '-y', # (optional) overwrite output file if it exists
+            '-f', 'image2pipe',
+            '-vcodec', 'mjpeg',
+            '-r', '30', # frames per second
+            '-i', '-', # The input comes from a pipe
+            '-vcodec', 'mpeg4',
+            '-an', # Tells FFMPEG not to expect any audio
+            fname ]
+
+        self.output = open('_video_recorder.out', 'w')
+        movie = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=self.output)
+
+        self.movie = movie
+        self.finished = False
+
+    def write_frame(self, data):
+        if self.finished:
+            return
+        self.movie.stdin.write(data)
+
+    def stop(self):
+        self.movie.communicate()
+        self.finished = True
+
+def html_embed_mp4(video_path):
+    VIDEO_TAG = """<video controls>
+     <source src="data:video/x-m4v;base64,{0}" type="video/mp4">
+     Your browser does not support the video tag.
+    </video>"""
+    video = open(video_path, "rb").read()
+    _encoded_video = video.encode("base64")
+    return VIDEO_TAG.format(_encoded_video)

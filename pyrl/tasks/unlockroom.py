@@ -137,7 +137,7 @@ class UnlockRoom(Task):
     def __repr__(self):
         return str(self.start_pos) + '->' + str(self.key_pos) + '->' + str(self.door_pos)
 
-    def visualize(self, fname = None):
+    def visualize(self, fname = None, format='jpg'):
         fig = plt.figure(1, figsize=(5,5))
         plt.clf()
         ax = fig.add_axes([0.0, 0.0, 1., 1.])
@@ -157,6 +157,6 @@ class UnlockRoom(Task):
         axicon.axis('off')
         ax.axis('off')
         if fname:
-            plt.savefig(fname)
+            plt.savefig(fname, format=format)
         else:
             plt.show()

@@ -3,6 +3,7 @@ import numpy as np
 import time
 import os
 import sys
+from datetime import datetime
 
 from StringIO import StringIO
 from pprint import pprint
@@ -57,6 +58,8 @@ def mkdir_if_not_exist(path):
     if not os.path.exists(path):
         os.makedirs(path)
 
+def get_runid():
+    return datetime.now().strftime('%m-%d-%y-%H-%M-%S.%f')
 
 class Timer(object):
     def __init__(self, name=None, output=sys.stdout):
@@ -76,7 +79,6 @@ class Timer(object):
             print >>self.output, '[%s]' % self.name,
         print >>self.output, 'Elapsed: %s' % (time.time() - self.tstart)
         self.output.flush()
-
 
 color2num = dict(
     gray=30,
