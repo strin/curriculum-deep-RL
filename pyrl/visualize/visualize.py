@@ -81,31 +81,30 @@ class VideoRecorder(object):
         self.movie.communicate()
         self.finished = True
 
-def html_embed_mp4(video_path):
-    VIDEO_TAG = """<video controls>
+def html_embed_mp4(video_path, style=''):
+    VIDEO_TAG = """<video controls style="%(style)s">
      <source src="data:video/x-m4v;base64,{0}" type="video/mp4">
      Your browser does not support the video tag.
-    </video>"""
+    </video>""" % dict(style=style)
     video = open(video_path, "rb").read()
     _encoded_video = video.encode("base64")
     return VIDEO_TAG.format(_encoded_video)
 
-def html_dbx_mp4(video_path):
+def html_dbx_mp4(video_path, style=''):
     """
     send the video to dropbox and returned a link to the file.
     """
     from pyrl.storage.dropbox import put_file, shared_link
     with open(video_path, 'rb') as f:
-        print 'uploading video to cloud'
         put_file('pyrl/' + video_path, f)
     link = shared_link('pyrl/' + video_path)
-    return html_mp4(link)
+    return html_mp4(link, style=style)
 
-def html_mp4(video_path):
-    VIDEO_TAG = """<video controls>
+def html_mp4(video_path, style=''):
+    VIDEO_TAG = """<video controls style="%(style)s">
      <source src="{0}" type="video/mp4">
      Your browser does not support the video tag.
-    </video>"""
+    </video>""" % dict(style=style)
     return VIDEO_TAG.format(video_path)
 
 

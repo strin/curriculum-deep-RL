@@ -61,24 +61,6 @@ def mkdir_if_not_exist(path):
 def get_runid():
     return datetime.now().strftime('%m-%d-%y-%H-%M-%S.%f')
 
-class Timer(object):
-    def __init__(self, name=None, output=sys.stdout):
-        self.name = name
-        if output and type(output) == str:
-            self.output = open(output, 'w')
-        else:
-            self.output = output
-
-    def __enter__(self):
-        print >>self.output, '[%s]' % self.name, 'Start'
-        self.tstart = time.time()
-        self.output.flush()
-
-    def __exit__(self, type, value, traceback):
-        if self.name:
-            print >>self.output, '[%s]' % self.name,
-        print >>self.output, 'Elapsed: %s' % (time.time() - self.tstart)
-        self.output.flush()
 
 color2num = dict(
     gray=30,
@@ -92,6 +74,7 @@ color2num = dict(
     crimson=38
 )
 
+
 def colorize(string, color, bold=False, highlight = False):
     attr = []
     num = color2num[color]
@@ -99,6 +82,30 @@ def colorize(string, color, bold=False, highlight = False):
     attr.append(unicode(num))
     if bold: attr.append('1')
     return '\x1b[%sm%s\x1b[0m' % (';'.join(attr), string)
+
+
+class Timer(object):
+    def __init__(self, name=None, output=sys.stdout):
+        self.name = name
+        if output and type(output) == str:
+            self.output = open(output, 'w')
+        else:
+            self.output = output
+
+    def __enter__(self):
+        if self.name:
+            print >>self.output, colorize('[%s]\t' % self.name, 'green'),
+        print >>self.output, colorize('Start', 'green')
+        self.tstart = time.time()
+        self.output.flush()
+
+    def __exit__(self, type, value, traceback):
+        if self.name:
+            print >>self.output, colorize('[%s]\t' % self.name, 'green'),
+        print >>self.output, colorize('Elapsed: %s' % (time.time() - self.tstart),
+                                      'green')
+        self.output.flush()
+
 
 MESSAGE_DEPTH = 0
 class Message(object):
