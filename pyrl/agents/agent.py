@@ -12,8 +12,21 @@ import pyrl.optimizers
 import pyrl.prob as prob
 
 class Policy(object):
-    def get_action(self, state):
+    def get_action(self, state, valid_actions=None):
         raise NotImplementedError()
+
+
+class RandomPolicy(object):
+    def __init__(self, num_actions):
+        self.num_actions = num_actions
+
+
+    def get_action(self, state, valid_actions=None):
+        if not valid_actions:
+            valid_actions = range(self.num_actions)
+        action = prob.choice(valid_actions, 1)[0]
+        return action
+
 
 class Vfunc(object):
     '''

@@ -27,6 +27,7 @@ def factorize_value_matrix(valmat, rank_n = 3, num_iter = 10000):
     mse = np.sqrt(np.sum(np.power(X * S * Y.T - valmat, 2)) / X.shape[0] / Y.shape[0])
     return (X, S, Y, mse)
 
+
 class TwoStreamQfunc(object):
     '''
     univeral value Q functions.
@@ -70,8 +71,5 @@ class TwoStreamQfunc(object):
                 feat_goals[ni, :].reshape(-1, 1)
             )
         return vals
-
-
-
 
 
