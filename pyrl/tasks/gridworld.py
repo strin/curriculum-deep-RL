@@ -72,6 +72,7 @@ class GridWorld(Task):
             self.state_3d[1, pos[0], pos[1]] = 1.
         self.state_3d[2, :, :] = self.grid
 
+
     @property
     def curr_state(self):
         '''
@@ -82,6 +83,19 @@ class GridWorld(Task):
             return np.array(self.state_3d)
         else:
             return self.curr_state_id
+
+
+    @property
+    def curr_state_dict(self):
+        '''
+        return a dict representtion of the state.
+        '''
+        return {
+            'pos': self.state_3d[0, :, :],
+            'goal': self.state_3d[1, :, :],
+            'grid': self.state_3d[2, :, :]
+        }
+
 
     @property
     def curr_state_id(self):
