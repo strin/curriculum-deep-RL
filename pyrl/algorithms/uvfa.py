@@ -139,20 +139,20 @@ class Horde(object):
                 nvas = []
                 terminals = []
 
-                terminals = []
                 for idx, sample in enumerate(samples):
                     state, action, next_state, reward, meta = sample
                     nva = meta['curr_valid_actions']
 
-                    states[idx] = state
+                    states[idx] = np.array(state['raw_state'])
+                    states[idx][1, goal[0], goal[1]] = 1.
                     actions[idx] = action
+                    reward = next_state['pos'][goal[0], goal[1]] # TODO: hack for gridworld.
                     rewards[idx] = reward
                     nvas.append(nva)
 
-                    if next_state is not None:
-                        next_states[idx] = next_state
-                    else:
-                        next_states[idx] = state
+                    next_states[idx] = np.array(next_state['raw_state'])
+                    next_states[idx][1, goal[0], goal[1]] = 1.
+                    if reward > 0.:
                         terminals.append(idx)
 
                 states = np.array(states)
@@ -165,8 +165,103 @@ class Horde(object):
                     if idx not in terminals:
                         next_vs[idx] = np.max(next_qvals[idx, nvas[idx]])
 
+
                 targets = rewards + self.gamma * next_vs
+
+
                 error = bprop(states, actions, targets.flatten())
+
+
+class AntiHorde(object):
+    def __init__(self, dqn, goals, gamma=0.95, l2_reg=0.0, lr=1e-3,
+                 experiences=[], minibatch_size=64):
+        self.dqn = dqn
+        self.goals = goals
+        self.l2_reg = l2_reg
+        self.lr = lr
+        self.minibatch_size = minibatch_size
+        self.gamma = gamma
+        self.experiences = experiences
+        self.bprop_by_goal = {}
+        self._compile_bp()
+
+    def _compile_bp(self):
+        dqn = self.dqn
+        states = dqn.states
+        action_values = dqn.action_values
+        params = dqn.params
+        targets = T.vector('target')
+        last_actions = T.lvector('action')
+
+        # loss function.
+        mse = layers.MSE(action_values[T.arange(action_values.shape[0]),
+                            last_actions], targets)
+        # l2 penalty.
+        l2_penalty = 0.
+        for param in params:
+            l2_penalty += (param ** 2).sum()
+
+        cost = mse + self.l2_reg * l2_penalty
+
+        # back propagation.
+        updates = optimizers.Adam(cost, params, alpha=self.lr)
+
+        td_errors = T.sqrt(mse)
+        self.bprop = theano.function(inputs=[states, last_actions, targets],
+                            outputs=td_errors, updates=updates)
+
+
+    def learn(self, num_iter=10):
+        for it in range(num_iter):
+            for goal in self.goals:
+                dqn = self.dqn
+                bprop = self.bprop
+                samples = prob.choice(self.experiences,
+                                        self.minibatch_size, replace=True) # draw with replacement.
+
+                # sample a minibatch.
+                states = [None] * self.minibatch_size
+                next_states = [None] * self.minibatch_size
+                actions = np.zeros(self.minibatch_size, dtype=int)
+                rewards = np.zeros(self.minibatch_size)
+                nvas = []
+                terminals = []
+
+                for idx, sample in enumerate(samples):
+                    state, action, next_state, reward, meta = sample
+                    nva = meta['curr_valid_actions']
+
+                    states[idx] = np.array(state['raw_state'])
+                    states[idx][1, goal[0], goal[1]] = 1.
+                    actions[idx] = action
+                    reward = next_state['pos'][goal[0], goal[1]] # TODO: hack for gridworld.
+                    rewards[idx] = reward
+                    nvas.append(nva)
+
+                    next_states[idx] = np.array(next_state['raw_state'])
+                    next_states[idx][1, goal[0], goal[1]] = 1.
+                    if reward > 0.:
+                        terminals.append(idx)
+
+                states = np.array(states)
+                next_states = np.array(next_states)
+
+                # learn through backpropagation.
+                next_qvals = dqn.fprop(next_states)
+                next_vs = np.zeros(self.minibatch_size)
+                for idx in range(self.minibatch_size):
+                    if idx not in terminals:
+                        next_vs[idx] = np.max(next_qvals[idx, nvas[idx]])
+
+
+                targets = rewards + self.gamma * next_vs
+
+
+                error = bprop(states, actions, targets.flatten())
+
+
+
+
 
 
 

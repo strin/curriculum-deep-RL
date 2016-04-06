@@ -73,6 +73,20 @@ class GridWorld(Task):
         self.state_3d[2, :, :] = self.grid
 
 
+    def yield_all_states(self):
+        '''
+        generate all possible states
+        '''
+        (h, w) = self.grid.shape
+        for pos in self._free_pos():
+            state_3d = np.zeros((3, h, w))
+            state_3d[0, pos[0], pos[1]] = 1.
+            for goal_pos in self.goal:
+                state_3d[1, goal_pos[0], goal_pos[1]] = 1.
+            state_3d[2, :, :] = self.grid
+            yield (pos, state_3d)
+
+
     @property
     def curr_state(self):
         '''
@@ -80,7 +94,7 @@ class GridWorld(Task):
         should deep copy the state as it will go into the experience buffer.
         '''
         if self.state_type == np.ndarray:
-            return np.array(self.state_3d)
+            return np.array(self.state_3d) # important: state_3d is mutable!
         else:
             return self.curr_state_id
 
@@ -91,10 +105,12 @@ class GridWorld(Task):
         return a dict representtion of the state.
         '''
         return {
-            'raw_state': self.state_3d[0, :, :], # state without goal, env.
-            'pos': self.state_3d[0, :, :],
-            'goal': self.state_3d[1, :, :],
-            'grid': self.state_3d[2, :, :]
+            'raw_state': np.array([self.state_3d[0, :, :],
+                                        np.zeros_like(self.state_3d[1, :, :]),
+                                        self.state_3d[2, :, :]]), # state without goal
+            'pos': np.array(self.state_3d[0, :, :]),
+            'goal': np.array(self.state_3d[1, :, :]),
+            'grid': np.array(self.state_3d[2, :, :])
         }
 
 

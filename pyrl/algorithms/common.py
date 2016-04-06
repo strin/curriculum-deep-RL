@@ -23,13 +23,11 @@ def generate_experience(policy, task, budget_experience, budget_per_episode=None
             action = policy.get_action(task.curr_state, valid_actions=task.valid_actions)
             reward = task.step(action)
 
-            if task.is_end():
-                curr_state_attr = None
-            else:
-                curr_state_attr = getattr(task, state_attr)
+            curr_state_attr = getattr(task, state_attr)
             meta = {
                 'curr_valid_actions': task.valid_actions,
-                'last_valid_actions': last_valid_actions
+                'last_valid_actions': last_valid_actions,
+                'end': task.is_end()
             }
             experience = (last_state_attr, action, curr_state_attr, reward, meta)
             experiences.append(experience)
@@ -48,6 +46,7 @@ def generate_experience_mt(policy, tasks, budget_experience, budget_per_episode=
     experiences = []
     while len(experiences) < budget_experience:
         task = prob.choice(tasks, 1)[0]
-        print 'chose', task
         experiences.extend(generate_experience(policy, task, budget_experience - len(experiences), budget_per_episode, budget_episodes=1, state_attr=state_attr))
     return experiences
+
+
