@@ -91,6 +91,7 @@ class GridWorld(Task):
         return a dict representtion of the state.
         '''
         return {
+            'raw_state': self.state_3d[0, :, :], # state without goal, env.
             'pos': self.state_3d[0, :, :],
             'goal': self.state_3d[1, :, :],
             'grid': self.state_3d[2, :, :]
