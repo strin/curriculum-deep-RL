@@ -12,6 +12,7 @@ import pyrl.prob as prob
 from pyrl.utils import Timer
 from pyrl.tasks.task import Task
 
+from pyrl.layers import SoftMax
 
 def factorize_value_matrix(valmat, rank_n = 3, num_iter = 10000):
     from optspace import optspace
@@ -124,7 +125,7 @@ class Horde(object):
                                         outputs=td_errors, updates=updates)
 
 
-    def learn(self, num_iter=10):
+    def learn(self, num_iter=10, print_lag=50):
         for it in range(num_iter):
             for (goal, dqn) in self.dqn_by_goal.items():
                 bprop = self.bprop_by_goal[goal]
@@ -171,6 +172,9 @@ class Horde(object):
 
                 error = bprop(states, actions, targets.flatten())
 
+            if print_lag and print_lag > 0 and it % print_lag == 0:
+                print 'iter = ', it, 'error = ', error
+
 
 class AntiHorde(object):
     def __init__(self, dqn, goals, gamma=0.95, l2_reg=0.0, lr=1e-3,
@@ -211,7 +215,7 @@ class AntiHorde(object):
                             outputs=td_errors, updates=updates)
 
 
-    def learn(self, num_iter=10):
+    def learn(self, num_iter=10, print_lag = 50):
         for it in range(num_iter):
             for goal in self.goals:
                 dqn = self.dqn
@@ -259,10 +263,96 @@ class AntiHorde(object):
 
                 error = bprop(states, actions, targets.flatten())
 
+            if print_lag and print_lag > 0 and it % print_lag == 0:
+                print 'iter = ', it, 'error = ', error
 
 
+class PolicyDistill(object):
+    def __init__(self, dqn_mt, dqn_by_goal, experiences, lr=1e-3, l2_reg=0., minibatch_size=128):
+        '''
+        '''
+        self.l2_reg = l2_reg
+        self.minibatch_size = minibatch_size
+        self.lr = lr
+
+        # experience is a dict: task -> experience buffer.
+        # an experience buffer is a list of tuples (s, q, va)
+        # s = state, q = list of normalized qvals, va = corresponding valid actions.
+        self.experiences = experiences
+        self.dqn_mt = dqn_mt
+        self.dqn_by_goal = dqn_by_goal
+        self.goals = self.dqn_by_goal.keys()
+
+        self._compile_bp()
 
 
+    def _compile_bp(self):
+        states = self.dqn_mt.states
+        params = self.dqn_mt.params
+        targets = T.matrix('target')
+        is_valid = T.matrix('is_valid')
+
+        # compute softmax for action_values
+        # numerical stability in mind.
+        action_values = self.dqn_mt.action_values
+        action_values -= (1 - is_valid) * 1e10
+        action_values_softmax = SoftMax(action_values)
+        action_values_softmax += (1 - is_valid)
+
+        # loss function: KL-divergence.
+        kl = T.sum(targets * is_valid * (T.log(targets) - T.log(action_values_softmax)))
+
+        # l2 penalty.
+        l2_penalty = 0.
+        for param in params:
+            l2_penalty += (param ** 2).sum()
+
+        cost = kl + self.l2_reg * l2_penalty
+
+        updates = optimizers.Adam(cost, params, alpha=self.lr)
+        self.bprop = theano.function(inputs=[states, targets, is_valid],
+                                     outputs=kl / states.shape[0], updates=updates)
+
+
+    def learn(self, num_iter=100, temperature=1., print_lag=None):
+        for it in range(num_iter):
+            dqn = self.dqn_mt
+            bprop = self.bprop
+            samples = prob.choice(self.experiences,
+                                    self.minibatch_size, replace=True) # draw with replacement.
+
+            # sample a minibatch.
+            is_valids = []
+            probs = []
+            states = []
+
+            for idx, sample in enumerate(samples):
+                # randomly choose a goal.
+                goal = prob.choice(self.goals, 1)[0]
+                dqn = self.dqn_by_goal[goal]
+
+                state, action, next_state, reward, meta = sample
+                valid_actions = meta['last_valid_actions']
+                num_actions = meta['num_actions']
+                raw_state = np.array(state['raw_state'])
+                raw_state[1, goal[0], goal[1]] = 1.
+
+                states.append(raw_state)
+
+                is_valid = [1. for action in range(num_actions) if action in set(valid_actions)]
+                is_valids.append(is_valid)
+
+                prob_vec = dqn._get_softmax_action_distribution(raw_state, temperature=temperature, valid_actions=valid_actions)
+                probs.append(prob_vec)
+
+            states = np.array(states)
+            probs = np.array(probs)
+            is_valids = np.array(is_valids)
+
+            score = self.bprop(states, probs, is_valids)
+
+            if print_lag and print_lag > 0 and it % print_lag == 0:
+                print 'iter = ', it, 'score = ', score
 
 
 

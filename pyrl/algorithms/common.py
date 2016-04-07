@@ -27,6 +27,7 @@ def generate_experience(policy, task, budget_experience, budget_per_episode=None
             meta = {
                 'curr_valid_actions': task.valid_actions,
                 'last_valid_actions': last_valid_actions,
+                'num_actions': task.num_actions,
                 'end': task.is_end()
             }
             experience = (last_state_attr, action, curr_state_attr, reward, meta)
