@@ -3,6 +3,71 @@ import numpy.random as npr
 from pyrl.tasks.task import Task
 from pyrl.algorithms.valueiter import compute_tabular_value
 
+def estimate_temperature(policy, states, entropy = 0.3, tol=1e-1):
+    '''
+    given a set of states, binary search temperature so that the average entropy of policy
+    is around given value.
+
+    policy should support *get_action_distribution*.
+    '''
+    temperature_left = 0.
+    temperature_right = 10.
+    phase = 0
+
+    while True:
+        if phase == 0:
+            temperature = temperature_right
+        else:
+            temperature = (temperature_left + temperature_right) / 2.
+
+        prob_entropy_list = []
+        for state in states:
+            prob = policy.get_action_distribution(state, method='softmax', temperature=temperature)
+            prob = prob.values()
+            prob = [p for p in prob if p != 0.]
+            prob_entropy = -np.sum(prob * np.log(prob))
+            prob_entropy_list.append(prob_entropy)
+        avg_prob_entropy = np.mean(prob_entropy_list)
+        if np.abs(avg_prob_entropy - entropy) < tol:
+            return temperature
+        elif avg_prob_entropy > entropy:
+            if phase == 0:
+                phase = 1
+            else:
+                temperature_right = temperature
+        else:
+            if phase == 0:
+                temperature_right = 2 * temperature_right
+            else:
+                temperature_left = temperature
+
+def reward_stochastic_softmax_samples(policy, task, gamma=0.95, num_trials = 100, budget=None, tol=1e-6, entropy=0.2):
+    total_reward = []
+
+    for ni in range(num_trials):
+        num_steps = 0
+        task.reset()
+        reward = 0.
+        factor = 1.
+        while num_steps < np.log(tol) / np.log(gamma):
+            if task.is_end():
+                break
+
+            if budget and num_steps >= budget:
+                break
+
+            curr_state = task.curr_state
+            # estimate temperature.
+            temperature = estimate_temperature(policy, [curr_state], entropy=entropy, tol=1e-2)
+            action = policy.get_action(curr_state, valid_actions=task.valid_actions, method='softmax', temperature=temperature)
+            reward += factor * task.step(action)
+            factor *= gamma
+            num_steps += 1
+        total_reward.append(reward)
+    task.reset()
+    return total_reward
+
+
 def reward_stochastic_samples(policy, task, gamma=0.95, num_trials = 100, budget=None, tol=1e-6, **args):
     total_reward = []
 
@@ -27,6 +92,7 @@ def reward_stochastic_samples(policy, task, gamma=0.95, num_trials = 100, budget
         total_reward.append(reward)
     task.reset()
     return total_reward
+
 
 def qval_stochastic_samples(policy, task, gamma=0.95, num_trials = 100, budget=20, **args):
     total_reward = []
@@ -88,6 +154,10 @@ def qval2_stochastic_samples(dqn, dqn2, task, gamma=0.95, num_trials = 100, budg
 
 def reward_stochastic(policy, task, gamma=0.95, num_trials=100, budget=None, tol=1e-6, **args):
     total_reward = reward_stochastic_samples(policy, task, gamma, num_trials, budget, tol, **args)
+    return np.mean(total_reward)
+
+def reward_stochastic_softmax(policy, task, gamma=0.95, num_trials=100, budget=None, tol=1e-6, entropy=1e-2):
+    total_reward = reward_stochastic_softmax_samples(policy, task, gamma, num_trials, budget, tol, entropy)
     return np.mean(total_reward)
 
 def qval_stochastic(policy, task, gamma=0.95, num_trials=100, budget=20, **args):
@@ -186,8 +256,4 @@ def eval_dataset(policy, tasks, method=expected_reward_tabular_normalized):
         reward += method(policy, task, tol=1e-4)
     return reward / len(tasks)
 
-def merge_line(xs, ys):
-    """
-    given a list of score lines, merge and average them into one.
-    """
 
