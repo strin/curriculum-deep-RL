@@ -41,7 +41,7 @@ def estimate_temperature(policy, states, entropy = 0.3, tol=1e-1):
             else:
                 temperature_left = temperature
 
-def reward_stochastic_softmax_samples(policy, task, gamma=0.95, num_trials = 100, budget=None, tol=1e-6, entropy=0.2):
+def reward_stochastic_softmax_samples(policy, task, gamma=0.95, num_trials = 100, budget=None, tol=1e-6, entropy=0.2, callback=None):
     total_reward = []
 
     for ni in range(num_trials):
@@ -50,13 +50,16 @@ def reward_stochastic_softmax_samples(policy, task, gamma=0.95, num_trials = 100
         reward = 0.
         factor = 1.
         while num_steps < np.log(tol) / np.log(gamma):
+            curr_state = task.curr_state
+            if callback:
+                callback(task)
+
             if task.is_end():
                 break
 
             if budget and num_steps >= budget:
                 break
 
-            curr_state = task.curr_state
             # estimate temperature.
             temperature = estimate_temperature(policy, [curr_state], entropy=entropy, tol=1e-2)
             action = policy.get_action(curr_state, valid_actions=task.valid_actions, method='softmax', temperature=temperature)
@@ -156,8 +159,8 @@ def reward_stochastic(policy, task, gamma=0.95, num_trials=100, budget=None, tol
     total_reward = reward_stochastic_samples(policy, task, gamma, num_trials, budget, tol, **args)
     return np.mean(total_reward)
 
-def reward_stochastic_softmax(policy, task, gamma=0.95, num_trials=100, budget=None, tol=1e-6, entropy=1e-2):
-    total_reward = reward_stochastic_softmax_samples(policy, task, gamma, num_trials, budget, tol, entropy)
+def reward_stochastic_softmax(policy, task, gamma=0.95, num_trials=100, budget=None, tol=1e-6, entropy=1e-2, callback=None):
+    total_reward = reward_stochastic_softmax_samples(policy, task, gamma, num_trials, budget, tol, entropy, callback)
     return np.mean(total_reward)
 
 def qval_stochastic(policy, task, gamma=0.95, num_trials=100, budget=20, **args):

@@ -67,7 +67,7 @@ class VideoRecorder(object):
             fname ]
 
         self.output = open('_video_recorder.out', 'w')
-        movie = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=self.output)
+        movie = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=self.output, stderr=self.output)
 
         self.movie = movie
         self.finished = False
