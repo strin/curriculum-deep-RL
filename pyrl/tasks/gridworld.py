@@ -61,6 +61,13 @@ class GridWorld(Task):
         return pos
 
     def reset(self):
+        # history.
+        self.last_action = None
+        self.last_state = None
+        self.num_steps = 0
+        self.cum_reward = 0
+
+        # state.
         self.hit_wall = False
         self.curr_pos = random.choice(self.free_pos)
         self.goal = dict(self.init_goal)
@@ -150,6 +157,12 @@ class GridWorld(Task):
             or state[1] >= self.grid.shape[1] or self.grid[state[0], state[1]]
 
     def step(self, action):
+        # record history.
+        self.last_action = action
+        self.last_state = self.curr_state
+        self.num_steps += 1
+
+        # run step.
         reward = 0.
 
         # update state_3d matrix
@@ -177,6 +190,7 @@ class GridWorld(Task):
                 del self.goal[self.curr_pos]
             del self.rewards[self.curr_pos]
 
+        self.cum_reward += reward
         return reward
 
     def is_end(self):
