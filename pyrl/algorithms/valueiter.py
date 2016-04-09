@@ -427,6 +427,7 @@ class DeepQlearn(object):
         tol: tolerance in terms of reward signal.
         budget: how many total steps to take.
         '''
+        cum_rewards = []
         total_steps = 0.
         for ei in range(num_episodes):
             task.reset()
@@ -434,6 +435,7 @@ class DeepQlearn(object):
             curr_state = task.curr_state
 
             num_steps = 0.
+            cum_reward = 0.
             while True:
                 # TODO: Hack!
                 if num_steps >= np.log(tol) / np.log(self.gamma):
@@ -446,6 +448,8 @@ class DeepQlearn(object):
                 self.last_action = action
 
                 reward = task.step(action)
+                cum_reward += reward
+
 
                 try:
                     next_state = task.curr_state
@@ -470,7 +474,9 @@ class DeepQlearn(object):
 
                 if budget and num_steps >= budget:
                     break
+            cum_rewards.append(cum_reward)
         task.reset()
+        return np.mean(cum_rewards)
 
 def compute_tabular_value(task, tol=1e-4):
     solver = ValueIterationSolver(task, tol=tol)
