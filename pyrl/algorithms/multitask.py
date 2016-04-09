@@ -275,6 +275,7 @@ class DeepQlearnMT(object):
         self.total_exp_by_task = {}
         self.ex_id = {}
         self.total_exp = 0
+        self.num_iter = 1 # how many minibatch steps per experience.
 
         # used for streaming updates
         self.last_state = None
@@ -327,7 +328,7 @@ class DeepQlearnMT(object):
             if self.ex_id[task] >= self.memory_size:
                 self.ex_id[task] = 0
 
-    def _update_net(self, task):
+    def update_net(self, num_iter=1):
         '''
             sample from the memory dataset and perform gradient descent on
             (target - Q(s, a))^2
@@ -340,10 +341,7 @@ class DeepQlearnMT(object):
         for task in self.ex_task:
             experience.extend(self.ex_task[task])
 
-        num_iter = 1
-        if self.update_strategy:
-            if self.update_strategy == 'task':
-                num_iter = len(self.ex_task)
+        errors = []
 
         for it in range(num_iter):
             # don't update the network until sufficient experience has been
@@ -395,7 +393,10 @@ class DeepQlearnMT(object):
             #print 'actions', actions
             #for it in range(10):
             error = self.bprop(states, actions, targets.flatten())
-            print 'error', error
+            errors.append(error)
+
+            #print 'it', it, 'error', error
+        return np.mean(errors)
 
     def _learn(self, task, next_state, reward, next_valid_actions):
         '''
@@ -403,7 +404,7 @@ class DeepQlearnMT(object):
         '''
         self._add_to_experience(task, self.last_state, self.last_action,
                                 next_state, reward, next_valid_actions)
-        self._update_net(task)
+        self.update_net(self.num_iter)
 
     def _end_episode(self, task, reward):
         if self.last_state is not None:
@@ -412,20 +413,25 @@ class DeepQlearnMT(object):
         self.last_state = None
         self.last_action = None
 
-    def run(self, task, num_episodes=100, tol=1e-4, budget=None):
+    def run(self, task, num_episodes=100, num_iter=10, tol=1e-4, budget=None):
         '''
         task: the task to run on.
         num_episodes: how many episodes to repeat at maximum.
         tol: tolerance in terms of reward signal.
         budget: how many total steps to take.
         '''
+        self.num_iter = num_iter
         total_steps = 0.
+        total_rewards = []
+
         for ei in range(num_episodes):
             task.reset()
 
             curr_state = task.curr_state
 
             num_steps = 0.
+            total_reward = 0.
+            factor = 1.
             while True:
                 # TODO: Hack!
                 if num_steps >= np.log(tol) / np.log(self.gamma):
@@ -438,6 +444,9 @@ class DeepQlearnMT(object):
                 self.last_action = action
 
                 reward = task.step(action)
+                total_reward += factor * reward
+                factor *= self.gamma
+
                 next_state = task.curr_state
 
                 num_steps += 1
@@ -452,5 +461,196 @@ class DeepQlearnMT(object):
 
                 if budget and num_steps >= budget:
                     break
+            total_rewards.append(total_reward)
         task.reset()
+
+        return np.mean(total_rewards)
+
+
+class DeepQlearnMixed(object):
+    '''
+    DeepMind's deep Q learning algorithms.
+    '''
+    def __init__(self, dqn_mt, gamma=0.95, l2_reg=0.0, lr=1e-3,
+               memory_size=250, minibatch_size=64, epsilon=0.05,
+               nn_num_batch=1, nn_num_iter=2):
+        '''
+        (TODO): task should be task info.
+        we don't use all of task properties/methods here.
+        only gamma and state dimension.
+        and we allow task switching.
+        '''
+        self.dqn = dqn_mt
+        self.l2_reg = l2_reg
+        self.lr = lr
+        self.epsilon = epsilon
+        self.memory_size = memory_size
+        self.minibatch_size = minibatch_size
+        self.gamma = gamma
+
+        # for now, keep experience as a list of tuples
+        self.experience = []
+        self.exp_idx = 0
+        self.total_exp = 0
+
+        # used for streaming updates
+        self.last_state = None
+        self.last_action = None
+
+        # params for nn optimization.
+        self.nn_num_batch = nn_num_batch
+        self.nn_num_iter = nn_num_iter
+
+        # dianostics.
+        self.diagnostics = {
+            'nn-error': [] # training of neural network on mini-batches.
+        }
+
+        # compile back-propagtion network
+        self._compile_bp()
+
+    def copy(self):
+        # copy dqn.
+        dqn_mt = self.dqn.copy()
+        learner = DeepQlearn(dqn_mt, self.gamma, self.l2_reg, self.lr, self.memory_size, self.minibatch_size, self.epsilon)
+        learner.experience = list(self.experience)
+        learner.exp_idx = self.exp_idx
+        learner.total_exp = self.total_exp
+        learner.last_state = self.last_state
+        learner.last_action = self.last_action
+        learner._compile_bp()
+        return learner
+
+    def _compile_bp(self):
+        states = self.dqn.states
+        action_values = self.dqn.action_values
+        params = self.dqn.params
+        targets = T.vector('target')
+        last_actions = T.lvector('action')
+
+        # loss function.
+        mse = layers.MSE(action_values[T.arange(action_values.shape[0]),
+                            last_actions], targets)
+        # l2 penalty.
+        l2_penalty = 0.
+        for param in params:
+            l2_penalty += (param ** 2).sum()
+
+        cost = mse + self.l2_reg * l2_penalty
+
+        # back propagation.
+        updates = optimizers.Adam(cost, params, alpha=self.lr)
+
+        td_errors = T.sqrt(mse)
+        self.bprop = theano.function(inputs=[states, last_actions, targets],
+                                     outputs=td_errors, updates=updates)
+
+    def _add_to_experience(self, s, a, ns, r, nva):
+        # TODO: improve experience replay mechanism by making it harder to
+        # evict experiences with high td_error, for example
+        # s, ns are state_vectors.
+        # nva is a list of valid_actions at the next state.
+        self.total_exp += 1
+        if len(self.experience) < self.memory_size:
+            self.experience.append((s, a, ns, r, nva))
+        else:
+            self.experience[self.exp_idx] = (s, a, ns, r, nva)
+            self.exp_idx += 1
+            if self.exp_idx >= self.memory_size:
+                self.exp_idx = 0
+
+    def _update_net(self):
+        '''
+            sample from the memory dataset and perform gradient descent on
+            (target - Q(s, a))^2
+        '''
+        # don't update the network until sufficient experience has been
+        # accumulated
+        # removing this might cause correlation for early samples. suggested to be used in curriculums.
+        #if len(self.experience) < self.memory_size:
+        #    return
+        for nn_bi in range(self.nn_num_batch):
+            states = [None] * self.minibatch_size
+            next_states = [None] * self.minibatch_size
+            actions = np.zeros(self.minibatch_size, dtype=int)
+            rewards = np.zeros(self.minibatch_size)
+            nvas = []
+
+            # sample and process minibatch
+            # samples = random.sample(self.experience, self.minibatch_size) # draw without replacement.
+            samples = prob.choice(self.experience, self.minibatch_size, replace=True) # draw with replacement.
+            terminals = []
+            for idx, sample in enumerate(samples):
+                state, action, next_state, reward, nva = sample
+
+                states[idx] = state
+                actions[idx] = action
+                rewards[idx] = reward
+                nvas.append(nva)
+
+                if next_state is not None:
+                    next_states[idx] = next_state
+                else:
+                    next_states[idx] = state
+                    terminals.append(idx)
+
+            # convert states into tensor.
+            states = np.array(states)
+            next_states = np.array(next_states)
+
+            # compute target reward + \gamma max_{a'} Q(ns, a')
+            # Ensure target = reward when NEXT_STATE is terminal
+            next_qvals = self.dqn.fprop(next_states)
+            next_vs = np.zeros(self.minibatch_size)
+            for idx in range(self.minibatch_size):
+                if idx not in terminals:
+                    next_vs[idx] = np.max(next_qvals[idx, nvas[idx]])
+
+            targets = rewards + self.gamma * next_vs
+
+            ## diagnostics.
+            #print 'targets', targets
+            #print 'next_qvals', next_qvals
+            #print 'pure prop', self.dqn.fprop(states)
+            #print 'prop', self.dqn.fprop(states)[range(states.shape[0]), actions]
+            #print 'actions', actions
+            nn_error = []
+            for nn_it in range(self.nn_num_iter):
+                error = self.bprop(states, actions, targets.flatten())
+                nn_error.append(float(error))
+            self.diagnostics['nn-error'].append(nn_error)
+
+
+    def _learn(self, task, reward):
+        '''
+        need next_valid_actions to compute appropriate V = max_a Q(s', a).
+        '''
+        self._add_to_experience(task.last_state, task.last_action,
+                                task.curr_state, reward, task.valid_actions)
+        self._update_net()
+
+
+    def _end_episode(self, task, reward):
+        if task.last_state is not None:
+            self._add_to_experience(task.last_state, task.last_action, None,
+                                    reward, [])
+        print '[task ended] task = ', str(task), 'cum_reward = ', task.cum_reward
+        task.reset()
+
+
+    def step(self, task, tol=1e-4):
+        if task.num_steps >= np.log(tol) / np.log(self.gamma):
+            # print 'Lying and tell the agent the episode is over!'
+            self._end_episode(task, 0)
+            return
+
+        action = self.dqn.get_action(task.curr_state,
+                        method='eps-greedy', epsilon=self.epsilon, valid_actions=task.valid_actions)
+        reward = task.step(action)
+
+
+        if task.is_end():
+            self._end_episode(task, reward)
+        else:
+            self._learn(task, reward)
 
