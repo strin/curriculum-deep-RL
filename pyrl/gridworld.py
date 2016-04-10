@@ -45,6 +45,9 @@ class Grid(environment.Environment):
                     state_num += 1
         return pos
 
+    def get_valid_states(self):
+        return [self.state_id[pos] for pos in self._free_pos()]
+
     @property
     def shape(self):
         return self.grid.shape

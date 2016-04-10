@@ -654,3 +654,115 @@ class DeepQlearnMixed(object):
         else:
             self._learn(task, reward)
 
+
+class PolicyDistill(object):
+    def __init__(self, dqn_mt, lr=1e-3, l2_reg=0., minibatch_size=128, loss='KL'):
+        '''
+        '''
+        self.l2_reg = l2_reg
+        self.minibatch_size = minibatch_size
+        self.lr = lr
+        self.loss = loss
+        assert(self.loss in ['KL', 'l2', 'l1', 'l1-action', 'l1-exp'])
+
+        # experience is a dict: task -> experience buffer.
+        # an experience buffer is a list of tuples (s, q, va)
+        # s = state, q = list of normalized qvals, va = corresponding valid actions.
+        self.experiences = experiences
+        self.dqn_mt = dqn_mt
+
+        self._compile_bp()
+
+
+    def _compile_bp(self):
+        states = self.dqn_mt.states
+        params = self.dqn_mt.params
+
+        targets = T.matrix('target')
+        is_valid = T.matrix('is_valid')
+        last_actions = T.lvector('action')
+
+        # compute softmax for action_values
+        # numerical stability in mind.
+        action_values = self.dqn_mt.action_values
+
+        # loss function: KL-divergence.
+        if self.loss == 'KL':
+            action_values -= (1 - is_valid) * 1e10
+            action_values_softmax = SoftMax(action_values)
+            action_values_softmax += (1 - is_valid)
+            loss = T.sum(targets * is_valid * (T.log(targets) - T.log(action_values_softmax)))
+        elif self.loss == 'l2':
+            loss = T.sum((targets - action_values) ** 2 * is_valid)
+        elif self.loss == 'l1' or self.loss == 'l1-action':
+            loss = T.sum(abs(targets.flatten() - action_values[T.arange(action_values.shape[0]),
+                                last_actions])  * is_valid.flatten())
+        elif self.loss == 'l1-exp':
+            temperature = 1.
+            qt = targets / temperature
+            qt_max = T.max(action_values, axis=1).dimshuffle(0, 'x')
+            qt_sub = qt - qt_max
+            b = T.log(T.exp(qt_sub).sum(axis=1)).dimshuffle(0, 'x') + qt_max
+            qs = action_values / temperature
+            loss = T.sum(abs(T.exp(qs - b) - T.exp(qt - b)))
+
+        # l2 penalty.
+        l2_penalty = 0.
+        for param in params:
+            l2_penalty += (param ** 2).sum()
+
+        cost = loss + self.l2_reg * l2_penalty
+
+        updates = optimizers.Adam(cost, params, alpha=self.lr)
+        self.bprop = theano.function(inputs=[states, last_actions, targets, is_valid],
+                                     outputs=loss / states.shape[0], updates=updates,
+                                     on_unused_input='warn')
+
+
+    def learn(self, experience_by_dqn, num_iter=100, temperature=1., print_lag=None):
+        experiences = []
+        for (dqn, experience) in experience_by_dqn.items():
+            experiences.extend([(dqn, ex) for ex in experience])
+
+        for it in range(num_iter):
+            bprop = self.bprop
+            samples = prob.choice(self.experiences,
+                                    self.minibatch_size, replace=True) # draw with replacement.
+
+            # sample a minibatch.
+            is_valids = []
+            targets = []
+            states = []
+            actions = np.zeros(self.minibatch_size, dtype=int)
+
+            for idx, sample in enumerate(samples):
+                (dqn, sample) = sample
+                state, last_action, next_state, reward, meta = sample
+                valid_actions = meta['last_valid_actions']
+                num_actions = meta['num_actions']
+
+                states.append(state)
+
+                is_valid = [1. for action in range(num_actions) if action in set(valid_actions)]
+
+                if self.loss == 'KL':
+                    target = dqn._get_softmax_action_distribution(state, temperature=temperature, valid_actions=valid_actions)
+                elif self.loss == 'l2' or self.loss == 'l1' or self.loss == 'l1-exp':
+                    target = dqn.av(state)
+                elif self.loss == 'l1-action':
+                    target = [dqn.av(state)[last_action]]
+                    is_valid  = [is_valid[last_action]]
+
+                is_valids.append(is_valid)
+                targets.append(target)
+                actions[idx] = last_action
+
+            states = np.array(states)
+            targets = np.array(targets)
+            is_valids = np.array(is_valids)
+
+            score = self.bprop(states, actions, targets, is_valids)
+
+            if print_lag and print_lag > 0 and it % print_lag == 0:
+                print 'iter = ', it, 'score = ', score
+

@@ -80,18 +80,24 @@ class GridWorld(Task):
         self.state_3d[2, :, :] = self.grid
 
 
-    def yield_all_states(self):
+    def yield_all_states(self, state_type=np.ndarray):
         '''
         generate all possible states
         '''
         (h, w) = self.grid.shape
         for pos in self._free_pos():
-            state_3d = np.zeros((3, h, w))
-            state_3d[0, pos[0], pos[1]] = 1.
-            for goal_pos in self.goal:
-                state_3d[1, goal_pos[0], goal_pos[1]] = 1.
-            state_3d[2, :, :] = self.grid
-            yield (pos, state_3d)
+            if state_type == np.ndarray:
+                state_3d = np.zeros((3, h, w))
+                state_3d[0, pos[0], pos[1]] = 1.
+                for goal_pos in self.goal:
+                    state_3d[1, goal_pos[0], goal_pos[1]] = 1.
+                state_3d[2, :, :] = self.grid
+                yield state_3d
+            elif state_type == str: # TODO: encode grid.
+                yield 'p' + str(pos) + 'g[' + ','.join([str(goal_pos) for
+                            goal_pos in self.goal]) + ']'
+            elif state_type == int:
+                yield pos[0] * w + pos[1]
 
 
     @property

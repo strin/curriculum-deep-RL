@@ -329,16 +329,16 @@ class DeepQlearn(object):
         self.bprop = theano.function(inputs=[states, last_actions, targets],
                                      outputs=td_errors, updates=updates)
 
-    def _add_to_experience(self, s, a, ns, r, nva):
+    def _add_to_experience(self, s, a, ns, r, meta):
         # TODO: improve experience replay mechanism by making it harder to
         # evict experiences with high td_error, for example
         # s, ns are state_vectors.
         # nva is a list of valid_actions at the next state.
         self.total_exp += 1
         if len(self.experience) < self.memory_size:
-            self.experience.append((s, a, ns, r, nva))
+            self.experience.append((s, a, ns, r, meta))
         else:
-            self.experience[self.exp_idx] = (s, a, ns, r, nva)
+            self.experience[self.exp_idx] = (s, a, ns, r, meta)
             self.exp_idx += 1
             if self.exp_idx >= self.memory_size:
                 self.exp_idx = 0
@@ -365,7 +365,8 @@ class DeepQlearn(object):
             samples = prob.choice(self.experience, self.minibatch_size, replace=True) # draw with replacement.
             terminals = []
             for idx, sample in enumerate(samples):
-                state, action, next_state, reward, nva = sample
+                state, action, next_state, reward, meta = sample
+                nva = meta['curr_valid_actions']
 
                 states[idx] = state
                 actions[idx] = action
@@ -412,10 +413,10 @@ class DeepQlearn(object):
                                 next_state, reward, next_valid_actions)
         self._update_net()
 
-    def _end_episode(self, reward):
+    def _end_episode(self, reward, meta):
         if self.last_state is not None:
             self._add_to_experience(self.last_state, self.last_action, None,
-                                    reward, [])
+                                    reward, meta)
             # self._update_net()
         self.last_state = None
         self.last_action = None
@@ -438,9 +439,14 @@ class DeepQlearn(object):
             cum_reward = 0.
             while True:
                 # TODO: Hack!
+                meta = {}
+                meta['last_valid_actions'] = task.valid_actions
+                meta['num_actions'] = task.num_actions
+
                 if num_steps >= np.log(tol) / np.log(self.gamma):
                     # print 'Lying and tell the agent the episode is over!'
-                    self._end_episode(0)
+                    meta['curr_valid_actions'] = []
+                    self._end_episode(0, meta)
                     break
 
                 action = self.dqn.get_action(curr_state, method='eps-greedy', epsilon=self.epsilon, valid_actions=task.valid_actions)
@@ -450,6 +456,7 @@ class DeepQlearn(object):
                 reward = task.step(action)
                 cum_reward += reward
 
+                meta['curr_valid_actions'] = task.valid_actions
 
                 try:
                     next_state = task.curr_state
@@ -463,13 +470,13 @@ class DeepQlearn(object):
 
                 # call diagnostics callback if provided.
                 if callback:
-                    callback(curr_state, action, next_state, reward)
+                    callback(curr_state, action, next_state, reward, meta)
 
                 if task.is_end() or not has_next_state:
-                    self._end_episode(reward)
+                    self._end_episode(reward, meta)
                     break
                 else:
-                    self._learn(next_state, reward, task.valid_actions)
+                    self._learn(next_state, reward, meta)
                     curr_state = next_state
 
                 if budget and num_steps >= budget:
