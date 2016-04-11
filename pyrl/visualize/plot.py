@@ -40,7 +40,7 @@ def plot_xy(x, y, names=None, xlabel='x', ylabel='y', title=''):
         xs = [x]
         ys = [y]
         names = ['line']
-    
+
     traces = []
 
     for (x, y, name) in zip(xs, ys, names):

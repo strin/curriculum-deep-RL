@@ -256,7 +256,7 @@ class DeepQlearn(object):
     DeepMind's deep Q learning algorithms.
     '''
     def __init__(self, dqn_mt, gamma=0.95, l2_reg=0.0, lr=1e-3,
-               memory_size=250, minibatch_size=64, epsilon=0.05,
+               memory_size=250, minibatch_size=64,
                nn_num_batch=1, nn_num_iter=2):
         '''
         (TODO): task should be task info.
@@ -267,7 +267,6 @@ class DeepQlearn(object):
         self.dqn = dqn_mt
         self.l2_reg = l2_reg
         self.lr = lr
-        self.epsilon = epsilon
         self.memory_size = memory_size
         self.minibatch_size = minibatch_size
         self.gamma = gamma
@@ -296,7 +295,7 @@ class DeepQlearn(object):
     def copy(self):
         # copy dqn.
         dqn_mt = self.dqn.copy()
-        learner = DeepQlearn(dqn_mt, self.gamma, self.l2_reg, self.lr, self.memory_size, self.minibatch_size, self.epsilon)
+        learner = DeepQlearn(dqn_mt, self.gamma, self.l2_reg, self.lr, self.memory_size, self.minibatch_size)
         learner.experience = list(self.experience)
         learner.exp_idx = self.exp_idx
         learner.total_exp = self.total_exp
@@ -421,7 +420,7 @@ class DeepQlearn(object):
         self.last_state = None
         self.last_action = None
 
-    def run(self, task, num_episodes=100, tol=1e-4, budget=None, callback=None):
+    def run(self, task, num_episodes=100, tol=1e-4, budget=None, callback=None, **kwargs):
         '''
         task: the task to run on.
         num_episodes: how many episodes to repeat at maximum.
@@ -449,7 +448,10 @@ class DeepQlearn(object):
                     self._end_episode(0, meta)
                     break
 
-                action = self.dqn.get_action(curr_state, method='eps-greedy', epsilon=self.epsilon, valid_actions=task.valid_actions)
+                action = self.dqn.get_action(curr_state, valid_actions=task.valid_actions, **kwargs)
+                if 'uct' in kwargs: # update uct.
+                    kwargs['uct'].visit(curr_state, action)
+
                 self.last_state = curr_state
                 self.last_action = action
 

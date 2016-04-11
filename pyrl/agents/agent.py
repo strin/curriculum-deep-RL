@@ -248,6 +248,32 @@ class DQN(Qfunc):
         probs = self._get_softmax_action_distribution(state_vector, temperature, valid_actions)
         return npr.choice(valid_actions, 1, replace=True, p=probs)[0]
 
+
+    def _get_uct_action(self, state_vector, uct, param_c, valid_actions, debug=False):
+        init_count = 1. # initial count for all actions.
+        action_values = {action: self.av(state_vector)[action] for action in valid_actions}
+        uct_values = {action: uct.count_sa(state_vector, action) for action in valid_actions}
+        uct_state_values = {action: uct.count_s(state_vector) for action in valid_actions}
+        ucb = {action: action_values[action] + param_c * np.sqrt(np.log((len(valid_actions) * init_count + uct_state_values[action])) \
+                            / (init_count + uct_values[action])) for action in valid_actions}
+        max_val = -float('inf')
+        max_actions = []
+        for (action, value) in ucb.items():
+            if value > max_val:
+                max_val = value
+                max_actions = [action]
+            if value == max_val:
+                max_actions.append(action)
+
+        if debug:
+            print 'action_values', action_values
+            print 'uct_values', uct_values
+            print 'uct_state_values', uct_state_values
+            print 'ucb', ucb
+
+        return prob.choice(max_actions, 1)[0]
+
+
     def get_action(self, state, **kwargs):
         if 'valid_actions' in kwargs:
             valid_actions = kwargs['valid_actions']
@@ -259,10 +285,14 @@ class DQN(Qfunc):
                 return self._get_eps_greedy_action(state, kwargs['epsilon'], valid_actions=valid_actions)
             elif method == 'softmax':
                 return self._get_softmax_action(state, kwargs['temperature'], valid_actions=valid_actions)
+            elif method == 'uct':
+                return self._get_uct_action(state, kwargs['uct'], kwargs['param_c'], valid_actions=valid_actions, debug=kwargs.get('debug'))
+            else:
+                raise Exception('[get_action] method unknown: ' + method)
         else:
             return self._get_eps_greedy_action(state, epsilon=0.05, valid_actions=valid_actions)
 
-    def get_action_distribution(self, state_vector, **kwargs):
+    def get_action_distribution(self, state_vector, **kwargs): #TODO: deal with valid actions.
         if 'method' in kwargs:
             method = kwargs['method']
             if method == 'eps-greedy':
