@@ -257,7 +257,7 @@ class DeepQlearn(object):
     '''
     def __init__(self, dqn_mt, gamma=0.95, l2_reg=0.0, lr=1e-3,
                memory_size=250, minibatch_size=64,
-               nn_num_batch=1, nn_num_iter=2):
+               nn_num_batch=1, nn_num_iter=2, regularizer={}):
         '''
         (TODO): task should be task info.
         we don't use all of task properties/methods here.
@@ -270,6 +270,7 @@ class DeepQlearn(object):
         self.memory_size = memory_size
         self.minibatch_size = minibatch_size
         self.gamma = gamma
+        self.regularizer = regularizer
 
         # for now, keep experience as a list of tuples
         self.experience = []
@@ -321,11 +322,23 @@ class DeepQlearn(object):
 
         cost = mse + self.l2_reg * l2_penalty
 
+        reg_vs = []
+        # mimic dqn regularizer.
+        reg = self.regularizer.get('dqn-q')
+        if reg:
+            print '[compile-dqn] [regularizer] mimic dqn'
+            dqn = reg['dqn']
+            param = reg['param']
+            print float(param) * self.minibatch_size / self.memory_size
+            prior_action_values = T.matrix('prior_avs')
+            reg_vs.append(prior_action_values)
+            cost += float(param) * self.minibatch_size / self.memory_size * T.sqrt(T.mean((action_values - prior_action_values) ** 2))
+
         # back propagation.
         updates = optimizers.Adam(cost, params, alpha=self.lr)
 
         td_errors = T.sqrt(mse)
-        self.bprop = theano.function(inputs=[states, last_actions, targets],
+        self.bprop = theano.function(inputs=[states, last_actions, targets] + reg_vs,
                                      outputs=td_errors, updates=updates)
 
     def _add_to_experience(self, s, a, ns, r, meta):
@@ -392,6 +405,20 @@ class DeepQlearn(object):
 
             targets = rewards + self.gamma * next_vs
 
+            if (targets > 100.).any():
+                print 'error, target > 1', targets
+                print 'rewards', rewards
+                print 'next_vs', next_vs
+
+            # regularizations.
+            reg_vs = []
+            reg = self.regularizer.get('dqn-q')
+            if reg:
+                dqn = reg['dqn']
+                dqn_avs = dqn.fprop(states)
+                reg_vs.append(dqn_avs)
+
+
             ## diagnostics.
             #print 'targets', targets
             #print 'next_qvals', next_qvals
@@ -400,7 +427,7 @@ class DeepQlearn(object):
             #print 'actions', actions
             nn_error = []
             for nn_it in range(self.nn_num_iter):
-                error = self.bprop(states, actions, targets.flatten())
+                error = self.bprop(states, actions, targets.flatten(), *reg_vs)
                 nn_error.append(float(error))
             self.diagnostics['nn-error'].append(nn_error)
 
@@ -472,7 +499,7 @@ class DeepQlearn(object):
 
                 # call diagnostics callback if provided.
                 if callback:
-                    callback(curr_state, action, next_state, reward, meta)
+                    callback(task)
 
                 if task.is_end() or not has_next_state:
                     self._end_episode(reward, meta)

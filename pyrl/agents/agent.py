@@ -78,7 +78,7 @@ class Qfunc(object):
         return {action: 1.}
 
     def copy(self):
-        import dill as pickle
+        from six.moves import cPickle as pickle
         return pickle.loads(pickle.dumps(self))
 
     def is_tabular(self):
@@ -274,6 +274,84 @@ class DQN(Qfunc):
         return prob.choice(max_actions, 1)[0]
 
 
+    def _get_relaxation_action(self, state_vector, dqn, uct, param_c, valid_actions, strategy='wa-state', debug=False):
+        init_count = 1. # initial count for all actions.
+        action_values = {action: self.av(state_vector)[action] for action in valid_actions}
+        uct_values = {action: uct.count_sa(state_vector, action) for action in valid_actions}
+        uct_state_values = {action: uct.count_s(state_vector) for action in valid_actions}
+        # ucb = upper confidence bound.
+        ucb = {action: action_values[action] + param_c * np.sqrt(np.log((len(valid_actions) * init_count + uct_state_values[action])) \
+                            / (init_count + uct_values[action])) for action in valid_actions}
+        # rb = relaxation bound.
+        rb = {action: dqn.av(state_vector)[action] for action in valid_actions}
+
+        print 'strategy', strategy
+        # just use rb.
+        if strategy == 'rb':
+            finalb = rb
+
+        # just use av.
+        if strategy == 'av':
+            finalb = action_values
+
+        # min of upper bounds.
+        if strategy == 'ucb-rb':
+            finalb = {action: min(ucb[action], rb[action]) for action in valid_actions}
+
+        #thres = 10
+        #finalb = {action: ucb[action] if uct.count_sa(state_vector, action) > thres else rb[action]
+        #          for action in valid_actions}
+
+        #thres = 10
+        #finalb = {action: ucb[action] if uct.count_s(state_vector) > thres else rb[action]
+        #          for action in valid_actions}
+
+        # weighted average.
+        if strategy == 'wa-state':
+            ratio = 1. / (1. + uct.count_s(state_vector))
+            finalb = {action: ucb[action] * (1 - ratio) + rb[action] * ratio for action in valid_actions}
+
+        # weighted average by state action.
+        if strategy == 'wa':
+            finalb = {}
+            for action in valid_actions:
+                ratio = 1. / (1. + uct.count_sa(state_vector, action))
+                finalb[action] = action_values[action] * (1 - ratio) + rb[action] * ratio
+
+        # duality-gap
+        if strategy == 'duality-gap':
+            gap2 = sum([(rb[action] - action_values[action]) **2 for action in valid_actions]) / len(valid_actions)
+            ratio = max(0, 1 - np.std(rb.values()) **2  / gap2 / uct.count_s(state_vector))
+            finalb = {action: ucb[action] * (1 - ratio) + rb[action] * ratio for action in valid_actions}
+            if debug:
+                print 'std of relaxation', np.std(rb.values())
+                print 'mean gap', np.sqrt(gap2)
+                print 'ratio', ratio
+
+        # finalb = ucb
+
+        # choose action.
+        max_val = -float('inf')
+        max_actions = []
+        for (action, value) in finalb.items():
+            if value > max_val:
+                max_val = value
+                max_actions = [action]
+            if value == max_val:
+                max_actions.append(action)
+
+        if debug:
+            print 'action_values', action_values
+            print 'uct_values', uct_values
+            print 'uct_state_values', uct_state_values
+            print 'ucb', ucb
+            print 'rb', rb
+            print 'finalb', finalb
+
+        return prob.choice(max_actions, 1)[0]
+
+
+
     def get_action(self, state, **kwargs):
         if 'valid_actions' in kwargs:
             valid_actions = kwargs['valid_actions']
@@ -287,6 +365,9 @@ class DQN(Qfunc):
                 return self._get_softmax_action(state, kwargs['temperature'], valid_actions=valid_actions)
             elif method == 'uct':
                 return self._get_uct_action(state, kwargs['uct'], kwargs['param_c'], valid_actions=valid_actions, debug=kwargs.get('debug'))
+            elif method == 'relax':
+                return self._get_relaxation_action(state, kwargs['dqn'], kwargs['uct'], kwargs['param_c'],
+                                                   valid_actions=valid_actions, strategy=kwargs.get('strategy'), debug=kwargs.get('debug'))
             else:
                 raise Exception('[get_action] method unknown: ' + method)
         else:

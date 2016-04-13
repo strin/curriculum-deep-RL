@@ -92,7 +92,7 @@ class GridWorld(Task):
                 for goal_pos in self.goal:
                     state_3d[1, goal_pos[0], goal_pos[1]] = 1.
                 state_3d[2, :, :] = self.grid
-                yield state_3d
+                yield (pos, state_3d)
             elif state_type == str: # TODO: encode grid.
                 yield 'p' + str(pos) + 'g[' + ','.join([str(goal_pos) for
                             goal_pos in self.goal]) + ']'
