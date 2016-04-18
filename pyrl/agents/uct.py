@@ -1,18 +1,6 @@
 # upper-confidence table for the agent to measure uncertainty.
 import dill as pickle
-
-class StateTable(object):
-    def __init__(self):
-        self.table = {}
-
-    def __setitem__(self, k, v):
-        k_str = pickle.dumps(k)
-        self.table[k_str] = v
-
-    def __getitem__(self, k):
-        k_str = pickle.dumps(k);
-        return self.table.get(k_str)
-
+from pyrl.agents.agent import StateTable
 
 class UCT(object):
     def __init__(self):

@@ -1,10 +1,5 @@
 # code for value iteration algorithms, such as Q-learning, SARSA, etc.
 # this refractors the old dqn.py module by decoupling agent and algorithms.
-import theano
-import theano.tensor as T
-import random
-import numpy as np
-import numpy.random as npr
 
 import pyrl.optimizers as optimizers
 import pyrl.layers as layers

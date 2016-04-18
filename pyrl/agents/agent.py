@@ -11,8 +11,22 @@ import pyrl.layers
 import pyrl.optimizers
 import pyrl.prob as prob
 
+
+class StateTable(object):
+    def __init__(self):
+        self.table = {}
+
+    def __setitem__(self, k, v):
+        k_str = pickle.dumps(k)
+        self.table[k_str] = v
+
+    def __getitem__(self, k):
+        k_str = pickle.dumps(k);
+        return self.table.get(k_str)
+
+
 class Policy(object):
-    def get_action(self, state, valid_actions=None):
+    def get_action(self, state, valid_actions=None, **kwargs):
         raise NotImplementedError()
 
 
@@ -21,7 +35,7 @@ class RandomPolicy(object):
         self.num_actions = num_actions
 
 
-    def get_action(self, state, valid_actions=None):
+    def get_action(self, state, valid_actions=None, **kwargs):
         if not valid_actions:
             valid_actions = range(self.num_actions)
         action = prob.choice(valid_actions, 1)[0]
@@ -89,7 +103,7 @@ class Qfunc(object):
         raise NotImplementedError()
 
 
-class QfuncTabular(Qfunc):
+class QfuncTabularOld(Qfunc):
     '''
     a tabular representation of Q funciton.
     '''
@@ -162,6 +176,96 @@ class QfuncTabular(Qfunc):
 
     def av(self, state):
         return self.table[state, :]
+
+
+class QfuncTabular(Qfunc):
+    '''
+    a more general tabular representation of Q funciton.
+    '''
+    def __init__(self):
+        self.table = StateTable()
+
+
+    def __call__(self, state, action):
+        action_values = self.av(state)
+        assert(action in action_values)
+        return action_values.get(action)
+
+
+    def _get_eps_greedy_action_distribution(self, state, epsilon):
+        raise NotImplementedError()
+
+
+    def _get_eps_greedy_action(self, state, epsilon, valid_actions):
+        if(random.random() < epsilon):
+            action = npr.choice(valid_actions, 1)[0]
+        else:
+            action_values = self.table[state]
+            vals = [action_values[a] for a in valid_actions]
+            max_poses = np.argwhere(vals == np.amax(vals)).reshape(-1)
+            action_i = npr.choice(max_poses, 1)
+            action = valid_actions[action_i]
+        return action
+
+
+    def _get_softmax_action_distribution(self, state, temperature, valid_actions):
+        action_values = self.av(state)
+        qvals = action_values[valid_actions]
+        qvals = qvals / temperature
+        p = np.exp(prob.normalize_log(qvals))
+        return p
+
+    def _get_softmax_action(self, state, temperature, valid_actions):
+        probs = self._get_softmax_action_distribution(state, temperature, valid_actions)
+        return npr.choice(valid_actions, 1, replace=True, p=probs)[0]
+
+
+    def get_action(self, state, **kwargs):
+        assert('valid_actions', in kwargs)
+        if 'method' in kwargs:
+            method = kwargs['method']
+            if method == 'eps-greedy':
+                return self._get_eps_greedy_action(state, kwargs['epsilon'], valid_actions=valid_actions)
+            elif method == 'softmax':
+                return self._get_softmax_action(state, kwargs['temperature'], valid_actions=valid_actions)
+        else:
+            return self._get_eps_greedy_action(state, epsilon=0.05, valid_actions=valid_actions)
+
+
+    def get_action_distribution(self, state, **kwargs):
+        if 'method' in kwargs:
+            method = kwargs['method']
+            if method == 'eps-greedy':
+                log_probs = self._get_eps_greedy_action_distribution(state, kwargs['epsilon'])
+            elif method == 'softmax':
+                log_probs = self._get_softmax_action_distribution(state, kwargs['temperature'])
+        else: # default, 0.05-greedy policy.
+            log_probs = self._get_eps_greedy_action_distribution(state, epsilon=0.05)
+        return {action: log_probs[action] for action in range(self.num_actions)}
+
+
+    def get(self, state, action):
+        actions_values = self.table[state]
+        if not action_values:
+            return None
+        if action not in actions_values:
+            return None
+        return action_values[action]
+
+
+    def set(self, state, action, value):
+        action_values = self.table[state]
+        if not action_values:
+            action_values = {}
+            self.table[state] = action_values
+        action_values[action] = value
+
+
+    def av(self, state):
+        actions_values = self.table[state]
+        assert(action_values)
+        return action_values
+
 
 class DQN(Qfunc):
     '''
