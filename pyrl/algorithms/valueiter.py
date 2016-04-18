@@ -1,6 +1,6 @@
 # code for value iteration algorithms, such as Q-learning, SARSA, etc.
 # this refractors the old dqn.py module by decoupling agent and algorithms.
-
+from pyrl.common import *
 import pyrl.optimizers as optimizers
 import pyrl.layers as layers
 import pyrl.prob as prob

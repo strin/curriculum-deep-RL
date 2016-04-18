@@ -1,9 +1,9 @@
 import numpy as np
 import numpy.random as npr
-from pyrl.tasks.task import Task
+from pyrl.tasks.task import Task, task_breakpoint
 from pyrl.algorithms.valueiter import compute_tabular_value
 
-def estimate_temperature(policy, states, entropy = 0.3, tol=1e-1):
+def estimate_temperature(policy, states, valid_actions, entropy = 0.3, tol=1e-1):
     '''
     given a set of states, binary search temperature so that the average entropy of policy
     is around given value.
@@ -21,14 +21,17 @@ def estimate_temperature(policy, states, entropy = 0.3, tol=1e-1):
             temperature = (temperature_left + temperature_right) / 2.
 
         prob_entropy_list = []
-        for state in states:
-            prob = policy.get_action_distribution(state, method='softmax', temperature=temperature)
+        for (state, va) in zip(states, valid_actions):
+            prob = policy.get_action_distribution(state, method='softmax', temperature=temperature, valid_actions=va)
             prob = prob.values()
             prob = [p for p in prob if p != 0.]
             prob_entropy = -np.sum(prob * np.log(prob))
             prob_entropy_list.append(prob_entropy)
         avg_prob_entropy = np.mean(prob_entropy_list)
         if np.abs(avg_prob_entropy - entropy) < tol:
+            return temperature
+        if temperature < 1e-100:
+            print '[warning] temperature = ', temperature
             return temperature
         elif avg_prob_entropy > entropy:
             if phase == 0:
@@ -40,6 +43,45 @@ def estimate_temperature(policy, states, entropy = 0.3, tol=1e-1):
                 temperature_right = 2 * temperature_right
             else:
                 temperature_left = temperature
+
+
+def reward_search_samples(search_func, task, num_trials=10, gamma=0.95, tol=1e-2, entropy=0.1, callback=None):
+    total_reward = []
+
+    for ni in range(num_trials):
+        num_steps = 0
+        task.reset()
+        reward = 0.
+        factor = 1.
+        while num_steps < np.log(tol) / np.log(gamma):
+            curr_state = task.curr_state
+
+            if callback:
+                callback(task)
+
+            sub_task = task_breakpoint(task)
+
+            policy = search_func(sub_task)
+
+            if task.is_end():
+                break
+
+            # estimate temperature.
+            temperature = estimate_temperature(policy, [curr_state], [task.valid_actions], entropy=entropy, tol=1e-2)
+            action = policy.get_action(curr_state, valid_actions=task.valid_actions, method='softmax', temperature=temperature)
+            reward += factor * task.step(action)
+            factor *= gamma
+            num_steps += 1
+        total_reward.append(reward)
+        print 'trial', ni, 'reward', reward
+    task.reset()
+    return total_reward
+
+
+def reward_search_mean_std(search_func, task, **kwargs):
+    samples = reward_search_samples(search_func, task, **kwargs)
+    return (np.mean(samples), np.std(samples))
+
 
 def reward_stochastic_softmax_samples(policy, task, gamma=0.95, num_trials = 100, budget=None, tol=1e-6, entropy=0.2, callback=None):
     total_reward = []
@@ -61,7 +103,7 @@ def reward_stochastic_softmax_samples(policy, task, gamma=0.95, num_trials = 100
                 break
 
             # estimate temperature.
-            temperature = estimate_temperature(policy, [curr_state], entropy=entropy, tol=1e-2)
+            temperature = estimate_temperature(policy, [curr_state], [task.valid_actions], entropy=entropy, tol=1e-2)
             action = policy.get_action(curr_state, valid_actions=task.valid_actions, method='softmax', temperature=temperature)
             reward += factor * task.step(action)
             factor *= gamma

@@ -121,3 +121,11 @@ class MDPTask(Task):
     def state_shape(self):
         return self.mdp.state_shape
 
+
+
+def task_breakpoint(task):
+    task_bp = task.copy()
+    new_task = task.copy()
+    new_task.reset = lambda: new_task.set_to(task_bp)
+    return new_task
+

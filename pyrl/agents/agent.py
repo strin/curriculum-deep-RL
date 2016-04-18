@@ -5,6 +5,7 @@ import numpy.random as npr
 import theano
 import theano.tensor as T
 import cPickle as pickle
+from scipy.sparse import coo_matrix
 # from theano.printing import pydotprint
 
 import pyrl.layers
@@ -16,12 +17,23 @@ class StateTable(object):
     def __init__(self):
         self.table = {}
 
+    def _encode(self, k):
+        '''
+        compress states using the fact they are sparse.
+        '''
+        return {
+            'p': np.nonzero(k),
+            'v': k[np.nonzero(k)],
+            's': k.shape
+        }
+
+
     def __setitem__(self, k, v):
-        k_str = pickle.dumps(k)
+        k_str = pickle.dumps(self._encode(k))
         self.table[k_str] = v
 
     def __getitem__(self, k):
-        k_str = pickle.dumps(k);
+        k_str = pickle.dumps(self._encode(k));
         return self.table.get(k_str)
 
 
@@ -31,13 +43,7 @@ class Policy(object):
 
 
 class RandomPolicy(object):
-    def __init__(self, num_actions):
-        self.num_actions = num_actions
-
-
-    def get_action(self, state, valid_actions=None, **kwargs):
-        if not valid_actions:
-            valid_actions = range(self.num_actions)
+    def get_action(self, state, valid_actions, **kwargs):
         action = prob.choice(valid_actions, 1)[0]
         return action
 
@@ -210,45 +216,77 @@ class QfuncTabular(Qfunc):
 
     def _get_softmax_action_distribution(self, state, temperature, valid_actions):
         action_values = self.av(state)
-        qvals = action_values[valid_actions]
+        ind = [action for action in valid_actions if action in action_values]
+        qvals = np.array([action_values[action] for action in valid_actions if action in action_values])
         qvals = qvals / temperature
         p = np.exp(prob.normalize_log(qvals))
-        return p
+        pv = np.zeros(len(valid_actions))
+        pv[ind] = p
+        return pv
 
     def _get_softmax_action(self, state, temperature, valid_actions):
         probs = self._get_softmax_action_distribution(state, temperature, valid_actions)
         return npr.choice(valid_actions, 1, replace=True, p=probs)[0]
 
 
+    def _get_uct_action(self, state_vector, uct, param_c, valid_actions, debug=False):
+        init_count = 1. # initial count for all actions.
+        action_values = {action: self.av(state_vector)[action] for action in valid_actions}
+        uct_values = {action: uct.count_sa(state_vector, action) for action in valid_actions}
+        uct_state_values = {action: uct.count_s(state_vector) for action in valid_actions}
+        ucb = {action: action_values[action] + param_c * np.sqrt(np.log((len(valid_actions) * init_count + uct_state_values[action])) \
+                            / (init_count + uct_values[action])) for action in valid_actions}
+        max_val = -float('inf')
+        max_actions = []
+        for (action, value) in ucb.items():
+            if value > max_val:
+                max_val = value
+                max_actions = [action]
+            if value == max_val:
+                max_actions.append(action)
+
+        if debug:
+            print 'action_values', action_values
+            print 'uct_values', uct_values
+            print 'uct_state_values', uct_state_values
+            print 'ucb', ucb
+
+        return prob.choice(max_actions, 1)[0]
+
     def get_action(self, state, **kwargs):
-        assert('valid_actions', in kwargs)
+        assert('valid_actions' in kwargs)
+        valid_actions = kwargs['valid_actions']
         if 'method' in kwargs:
             method = kwargs['method']
             if method == 'eps-greedy':
                 return self._get_eps_greedy_action(state, kwargs['epsilon'], valid_actions=valid_actions)
             elif method == 'softmax':
                 return self._get_softmax_action(state, kwargs['temperature'], valid_actions=valid_actions)
+            elif method == 'uct':
+                return self._get_uct_action(state, kwargs['uct'], kwargs['param_c'], valid_actions=valid_actions, debug=kwargs.get('debug'))
         else:
             return self._get_eps_greedy_action(state, epsilon=0.05, valid_actions=valid_actions)
 
 
     def get_action_distribution(self, state, **kwargs):
+        assert('valid_actions' in kwargs)
+        valid_actions = kwargs['valid_actions']
         if 'method' in kwargs:
             method = kwargs['method']
             if method == 'eps-greedy':
-                log_probs = self._get_eps_greedy_action_distribution(state, kwargs['epsilon'])
+                log_probs = self._get_eps_greedy_action_distribution(state, kwargs['epsilon'], valid_actions=valid_actions)
             elif method == 'softmax':
-                log_probs = self._get_softmax_action_distribution(state, kwargs['temperature'])
+                log_probs = self._get_softmax_action_distribution(state, kwargs['temperature'], valid_actions=valid_actions)
         else: # default, 0.05-greedy policy.
-            log_probs = self._get_eps_greedy_action_distribution(state, epsilon=0.05)
-        return {action: log_probs[action] for action in range(self.num_actions)}
+            log_probs = self._get_eps_greedy_action_distribution(state, epsilon=0.05, valid_actions=valid_actions)
+        return {action: log_probs[action] for action in valid_actions}
 
 
     def get(self, state, action):
-        actions_values = self.table[state]
+        action_values = self.table[state]
         if not action_values:
             return None
-        if action not in actions_values:
+        if action not in action_values:
             return None
         return action_values[action]
 
@@ -262,7 +300,7 @@ class QfuncTabular(Qfunc):
 
 
     def av(self, state):
-        actions_values = self.table[state]
+        action_values = self.table[state]
         assert(action_values)
         return action_values
 

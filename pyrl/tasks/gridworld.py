@@ -3,6 +3,7 @@ from pyrl.tasks.task import Task
 import random
 import numpy as np
 import matplotlib.pyplot as plt
+import dill as pickle
 
 class GridWorld(Task):
     ''' RL variant of gridworld where the dynamics and reward function are not
@@ -45,6 +46,11 @@ class GridWorld(Task):
         # start the game fresh.
         self.reset()
 
+
+    def copy(self):
+        return pickle.loads(pickle.dumps(self))
+
+
     def _free_pos(self):
         pos = []
         self.state_id = {}
@@ -78,6 +84,21 @@ class GridWorld(Task):
         for pos in self.goal:
             self.state_3d[1, pos[0], pos[1]] = 1.
         self.state_3d[2, :, :] = self.grid
+
+
+    def set_to(self, task):
+        # history.
+        self.last_action = task.last_action
+        self.last_state = np.array(task.last_state)
+        self.num_steps = task.num_steps
+        self.cum_reward = task.cum_reward
+
+        # state.
+        self.hit_wall = task.hit_wall
+        self.curr_pos = task.curr_pos
+        self.goal = dict(task.init_goal)
+        self.rewards = dict(task.init_rewards)
+        self.state_3d = np.array(task.state_3d)
 
 
     def yield_all_states(self, state_type=np.ndarray):
