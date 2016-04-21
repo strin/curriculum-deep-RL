@@ -14,6 +14,7 @@ def estimate_temperature(policy, states, valid_actions, entropy = 0.3, tol=1e-1)
     temperature_right = 10.
     phase = 0
 
+    iteration = 0.
     while True:
         if phase == 0:
             temperature = temperature_right
@@ -30,7 +31,7 @@ def estimate_temperature(policy, states, valid_actions, entropy = 0.3, tol=1e-1)
         avg_prob_entropy = np.mean(prob_entropy_list)
         if np.abs(avg_prob_entropy - entropy) < tol:
             return temperature
-        if temperature < 1e-100:
+        if temperature < 1e-100 or temperature > 1e100:
             print '[warning] temperature = ', temperature
             return temperature
         elif avg_prob_entropy > entropy:
@@ -43,6 +44,11 @@ def estimate_temperature(policy, states, valid_actions, entropy = 0.3, tol=1e-1)
                 temperature_right = 2 * temperature_right
             else:
                 temperature_left = temperature
+
+        if iteration >= 10000:
+            print '[warning] temperature, too many iterations', temperature
+            print prob
+        iteration += 1
 
 
 def reward_search_samples(search_func, task, num_trials=10, gamma=0.95, tol=1e-2, entropy=0.1, callback=None):

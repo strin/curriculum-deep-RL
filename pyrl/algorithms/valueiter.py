@@ -79,12 +79,13 @@ class ValueIterationSolver(object):
 
 
 class Qlearn(object):
-    def __init__(self, qfunc, gamma=0.95, alpha=1., epsilon=0.05):
+    def __init__(self, qfunc, gamma=0.95, alpha=1., epsilon=0.05, mode='backward'):
         self.qfunc = qfunc
         self.gamma = gamma
         self.alpha = alpha
         self.epsilon = epsilon
         self.total_exp = 0
+        self.mode = mode
 
     def copy(self):
         # copy dqn.
@@ -93,7 +94,7 @@ class Qlearn(object):
         learner.total_exp = self.total_exp
         return learner
 
-    def run(self, task, num_episodes=100, tol=1e-4, budget=None):
+    def run(self, task, num_episodes=100, num_steps=float('inf'), tol=1e-4):
         '''
         task: the task to run on.
         num_episodes: how many episodes to repeat at maximum.
@@ -101,38 +102,80 @@ class Qlearn(object):
         budget: how many total steps to take.
         '''
         total_steps = 0.
+        cum_rewards = []
+
         for ei in range(num_episodes):
             task.reset()
 
             curr_state = task.curr_state
 
-            num_steps = 0.
+            steps = 0.
+            cum_reward = 0.
+            factor = 1.
+
+            history = []
+
             while True:
                 # TODO: Hack!
-                if num_steps >= np.log(tol) / np.log(self.gamma):
+                if steps >= np.log(tol) / np.log(self.gamma):
                     # print 'Lying and tell the agent the episode is over!'
+                    break
+
+                if total_steps > num_steps:
                     break
 
                 action = self.qfunc.get_action(curr_state, method='eps-greedy', epsilon=self.epsilon, valid_actions=task.valid_actions)
                 reward = task.step(action)
                 next_state = task.curr_state
 
-                num_steps += 1
+                meta = {
+                    'is_terminal': task.is_end(),
+                    'next_valid_actions': task.valid_actions
+                }
+                history.append((curr_state, action, next_state, reward, meta))
+
+                steps += 1
                 total_steps += 1
                 self.total_exp += 1
 
-                self.qfunc.table[curr_state, action] *= (1 - self.alpha)
-                if task.is_end():
-                    self.qfunc.table[curr_state, action] += self.alpha * reward
-                    break
-                else:
-                    self.qfunc.table[curr_state, action] += self.alpha * (reward
-                                                + self.gamma * np.max(self.qfunc.table[next_state, :]))
-                    curr_state = next_state
+                cum_reward = cum_reward + factor * reward
+                factor *= self.gamma
 
-                if budget and num_steps >= budget:
+                if task.is_end():
                     break
+
+                curr_state = next_state
+
+            if self.mode == 'backward': # backward mode.
+                _history = history[::-1]
+            else: # forward mode.
+                _history = history
+
+            for (i, (state, action, next_state, reward, meta)) in enumerate(_history):
+                curr_val = self.qfunc.get(state, action)
+                if not curr_val:
+                    curr_val = 0.
+                curr_val *= (1. - self.alpha)
+                next_valid_actions = meta['next_valid_actions']
+                if i > 0:
+                    new_val = -float('inf')
+                    for a in next_valid_actions:
+                        val = self.qfunc.get(next_state, a)
+                        if val != None and val > new_val:
+                            new_val = val
+                    new_val *= self.gamma
+                else:
+                    new_val = 0.
+                new_val += reward
+                curr_val += self.alpha * new_val
+                self.qfunc.set(state, action, curr_val)
+
+            cum_rewards.append(cum_reward)
+            if total_steps > num_steps:
+                break
+
         task.reset()
+        return np.mean(cum_rewards)
 
 
 class QlearnReplay(object):

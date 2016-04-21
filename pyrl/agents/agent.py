@@ -203,11 +203,12 @@ class QfuncTabular(Qfunc):
 
 
     def _get_eps_greedy_action(self, state, epsilon, valid_actions):
-        if(random.random() < epsilon):
+        action_values = self.av(state)
+        if random.random() < epsilon or not action_values:
             action = npr.choice(valid_actions, 1)[0]
         else:
-            action_values = self.table[state]
-            vals = [action_values[a] for a in valid_actions]
+            vals = [action_values.get(a) for a in valid_actions]
+            vals = map(lambda val: -float('inf') if not val else val, vals)
             max_poses = np.argwhere(vals == np.amax(vals)).reshape(-1)
             action_i = npr.choice(max_poses, 1)
             action = valid_actions[action_i]
@@ -216,6 +217,8 @@ class QfuncTabular(Qfunc):
 
     def _get_softmax_action_distribution(self, state, temperature, valid_actions):
         action_values = self.av(state)
+        if not action_values:
+            return np.ones(len(valid_actions)) / float(len(valid_actions))
         ind = [action for action in valid_actions if action in action_values]
         qvals = np.array([action_values[action] for action in valid_actions if action in action_values])
         qvals = qvals / temperature
@@ -301,7 +304,6 @@ class QfuncTabular(Qfunc):
 
     def av(self, state):
         action_values = self.table[state]
-        assert(action_values)
         return action_values
 
 

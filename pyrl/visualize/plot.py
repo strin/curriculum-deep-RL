@@ -9,7 +9,7 @@ from datetime import datetime
 init_notebook_mode() # run at the start of every ipython notebook to use plotly.offline
                      # this injects the plotly.js source files into the notebook
 
-def plot_xy(x, y, names=None, xlabel='x', ylabel='y', title=''):
+def plot_xy(x, y, names=None, error_ys=None, xlabel='x', ylabel='y', title=''):
 
     layout = go.Layout(
         title=title,
@@ -43,11 +43,20 @@ def plot_xy(x, y, names=None, xlabel='x', ylabel='y', title=''):
 
     traces = []
 
-    for (x, y, name) in zip(xs, ys, names):
+    for (i, (x, y)) in enumerate(zip(xs, ys)):
+        kwargs = {}
+        if names:
+            kwargs['name'] = names[i]
+        if error_ys:
+            kwargs['error_y'] = dict(
+                type='data',     # or 'percent', 'sqrt', 'constant'
+                array=error_ys[i],     # values of error bars
+                visible=True
+            )
         trace = go.Scatter(
             x = x,
             y = y,
-            name = name
+            **kwargs
         )
         traces.append(trace)
 
@@ -56,7 +65,7 @@ def plot_xy(x, y, names=None, xlabel='x', ylabel='y', title=''):
     disp = iplot(fig)
 
 
-def plot_bar(xs, ys, names, xlabel='x', ylabel='y', title=''):
+def plot_bar(xs, ys, names, error_ys=None, xlabel='x', ylabel='y', title=''):
 
     layout = go.Layout(
         title=title,
@@ -80,14 +89,26 @@ def plot_bar(xs, ys, names, xlabel='x', ylabel='y', title=''):
 
     traces = []
 
-    for (y, name) in zip(ys, names):
+    for (i, y) in enumerate(ys):
+        kwargs = {}
+        if names:
+            kwargs['name'] = names[i]
+        if error_ys:
+            kwargs['error_y'] = dict(
+                type='data',     # or 'percent', 'sqrt', 'constant'
+                array=error_ys[i],     # values of error bars
+                visible=True
+            )
         trace = go.Bar(
-            x = xs,
+            x = xs[i],
             y = y,
-            name = name
+            **kwargs
         )
         traces.append(trace)
 
     data = traces
+    print 'data', data
+
     fig = go.Figure(data=data, layout=layout)
-    disp = iplot(fig, filename='mocha-gauge-caffe-plotbar-' + datetime.now().strftime('%a, %d %b %Y %H:%M:%S +0000'))
+    # disp = iplot(fig, filename=datetime.now().strftime('%a, %d %b %Y %H:%M:%S +0000'))
+    disp = iplot(fig) # offline mode, no need for filename.
