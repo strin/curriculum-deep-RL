@@ -16,6 +16,7 @@ class MCTS(object):
         self.param_c = param_c
         self.lam = lam
         self.rb = rb
+        self.total_exp = 0
 
 
     def backprop(self, history):
@@ -82,7 +83,7 @@ class MCTS(object):
                 curr_state = task.curr_state
                 meta = {}
 
-                unvisited_actions = [action for action in task.valid_actions if not self.qval.get(curr_state, action)]
+                unvisited_actions = [action for action in task.valid_actions if self.qval.get(curr_state, action) == None]
 
                 if not phase_expansion and unvisited_actions: # can we switch back to qval if unvisited is empty?
                     phase_expansion = True
@@ -97,7 +98,8 @@ class MCTS(object):
 
                 else: # select.
                     meta['phase'] = 'selection'
-                    action = self.qval.get_action(curr_state, valid_actions=task.valid_actions, method='uct', uct=self.uct, param_c=self.param_c)
+                    action = self.qval.get_action(curr_state, valid_actions=task.valid_actions, method='uct', uct=self.uct, param_c=self.param_c, debug=False)
+                    # action = self.qval.get_action(curr_state, valid_actions=task.valid_actions, method='eps-greedy', epsilon=0.05)
 
                 meta['valid_actions'] = task.valid_actions
 
@@ -108,6 +110,7 @@ class MCTS(object):
                 history.append((curr_state, action, reward, meta))
                 count_steps += 1
                 total_steps += 1
+                self.total_exp += 1
 
             cum_rewards.append(cum_reward)
 
@@ -116,6 +119,7 @@ class MCTS(object):
 
         task.reset()
         print 'ei', ei
+        print 'cum', cum_rewards
         return np.mean(cum_rewards)
 
 
