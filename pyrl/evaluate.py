@@ -32,7 +32,7 @@ def estimate_temperature(policy, states, valid_actions, entropy = 0.3, tol=1e-1)
         if np.abs(avg_prob_entropy - entropy) < tol:
             return temperature
         if temperature < 1e-100 or temperature > 1e100:
-            print '[warning] temperature = ', temperature
+            #print '[warning] temperature = ', temperature
             return temperature
         elif avg_prob_entropy > entropy:
             if phase == 0:
@@ -46,7 +46,7 @@ def estimate_temperature(policy, states, valid_actions, entropy = 0.3, tol=1e-1)
                 temperature_left = temperature
 
         if iteration >= 10000:
-            print '[warning] temperature, too many iterations', temperature
+            #print '[warning] temperature, too many iterations', temperature
             print prob
         iteration += 1
 

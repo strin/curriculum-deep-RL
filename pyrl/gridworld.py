@@ -134,10 +134,6 @@ class GridWorldMDP(environment.MDP):
             return self.env.get_allowed_actions(state)
 
     def get_reward(self, state, action, next_state):
-        # returns the reward based on the (s, a, s') triple
-        if (state == next_state):
-            return self.wall_penalty
-
         if (self.env.state_pos[next_state] in self.rewards):
             return self.rewards[self.env.state_pos[next_state]]
 

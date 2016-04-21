@@ -94,7 +94,7 @@ class Qlearn(object):
         learner.total_exp = self.total_exp
         return learner
 
-    def run(self, task, num_episodes=100, num_steps=float('inf'), tol=1e-4):
+    def run(self, task, num_episodes=100, num_steps=float('inf'), tol=1e-4, callback=None):
         '''
         task: the task to run on.
         num_episodes: how many episodes to repeat at maximum.
@@ -127,6 +127,9 @@ class Qlearn(object):
                 action = self.qfunc.get_action(curr_state, method='eps-greedy', epsilon=self.epsilon, valid_actions=task.valid_actions)
                 reward = task.step(action)
                 next_state = task.curr_state
+
+                if callback:
+                    callback(task)
 
                 meta = {
                     'is_terminal': task.is_end(),

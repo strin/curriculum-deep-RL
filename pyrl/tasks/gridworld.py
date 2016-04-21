@@ -181,7 +181,10 @@ class GridWorld(Task):
 
     def _out_of_bounds(self, state):
         return state[0] < 0 or state[0] >= self.grid.shape[0] or state[1] < 0 \
-            or state[1] >= self.grid.shape[1] or self.grid[state[0], state[1]]
+            or state[1] >= self.grid.shape[1]
+
+    def _hit_wall(self, state):
+        return self.state_3d[2, state[0], state[1]]
 
     def step(self, action):
         # record history.
@@ -200,11 +203,12 @@ class GridWorld(Task):
             tmp = self._move(self.curr_pos, random.choice(self.actions))
         else:
             tmp = self._move(self.curr_pos, self.actions[action])
-        if self._out_of_bounds(tmp):
-            self.hit_wall = True
-        else:
-            self.hit_wall = False
-            self.curr_pos = tmp
+        if not self._out_of_bounds(tmp):
+            if self._hit_wall(tmp):
+                self.hit_wall = True
+            else:
+                self.curr_pos = tmp
+
 
         # update state_3d matrix.
         self.state_3d[0, self.curr_pos[0], self.curr_pos[1]] = 1.
@@ -221,6 +225,8 @@ class GridWorld(Task):
         return reward
 
     def is_end(self):
+        if self.wall_penalty == 'death' and self.hit_wall:
+            return True
         return len(self.goal) == 0
 
     def visualize(self, fig = 1, fname = None, format='png'):
