@@ -312,13 +312,12 @@ class DQN(Qfunc):
     A deep Q function that uses theano.
     TODO: dependence on task is only on task.num_actions.
     '''
-    def __init__(self, num_actions, arch_func, state_type=T.matrix):
+    def __init__(self, num_actions, arch_func):
         '''
         epsilon: probability for taking a greedy action.
         '''
         self.arch_func = arch_func
         self.num_actions = num_actions
-        self.state_type = state_type
         self._initialize_net()
 
     def is_tabular(self):
@@ -333,8 +332,7 @@ class DQN(Qfunc):
         Initialize the deep Q neural network.
         '''
         # construct computation graph for forward pass
-        self.states = self.state_type('states')
-        self.action_values, model = self.arch_func(self.states)
+        self.states, self.action_values, model = self.arch_func()
         self.params = sum([layer.params for layer in model.values()], [])
 
         self.fprop = theano.function(inputs=[self.states],

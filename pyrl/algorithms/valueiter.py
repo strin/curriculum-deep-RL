@@ -469,6 +469,7 @@ class DeepQlearn(object):
             nn_error = []
             for nn_it in range(self.nn_num_iter):
                 error = self.bprop(states, actions, targets.flatten(), *reg_vs)
+                # print 'nn_it', nn_it, 'error', error
                 nn_error.append(float(error))
             self.diagnostics['nn-error'].append(nn_error)
 
@@ -504,6 +505,7 @@ class DeepQlearn(object):
 
             num_steps = 0.
             cum_reward = 0.
+            factor = 1.
             while True:
                 # TODO: Hack!
                 meta = {}
@@ -524,7 +526,8 @@ class DeepQlearn(object):
                 self.last_action = action
 
                 reward = task.step(action)
-                cum_reward += reward
+                cum_reward += factor * reward
+                factor *= self.gamma
 
                 meta['curr_valid_actions'] = task.valid_actions
 
