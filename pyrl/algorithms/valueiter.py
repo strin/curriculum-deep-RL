@@ -8,6 +8,7 @@ from pyrl.utils import Timer
 from pyrl.tasks.task import Task
 from pyrl.agents.agent import DQN
 from pyrl.agents.agent import TabularVfunc
+from pyrl.config import floatX
 
 class ValueIterationSolver(object):
     '''
@@ -308,12 +309,12 @@ class DeepQlearn(object):
         '''
         self.dqn = dqn_mt
         self.dqn_frozen = dqn_mt.copy()
-        self.l2_reg = l2_reg
-        self.lr = lr
+        self.l2_reg = floatX(l2_reg)
+        self.lr = floatX(lr)
         self.target_freq = target_freq
         self.memory_size = memory_size
         self.minibatch_size = minibatch_size
-        self.gamma = gamma
+        self.gamma = floatX(gamma)
         self.regularizer = regularizer
 
         # for now, keep experience as a list of tuples
@@ -385,7 +386,8 @@ class DeepQlearn(object):
 
         td_errors = T.sqrt(mse)
         self.bprop = theano.function(inputs=[states, last_actions, targets] + reg_vs,
-                                     outputs=td_errors, updates=updates)
+                                     outputs=td_errors, updates=updates,
+                                     allow_input_downcast=True)
 
     def _add_to_experience(self, s, a, ns, r, meta):
         # TODO: improve experience replay mechanism by making it harder to
@@ -439,13 +441,13 @@ class DeepQlearn(object):
                     terminals.append(idx)
 
             # convert states into tensor.
-            states = np.array(states)
-            next_states = np.array(next_states)
+            states = np.array(states).astype(floatX)
+            next_states = np.array(next_states).astype(floatX)
 
             # compute target reward + \gamma max_{a'} Q(ns, a')
             # Ensure target = reward when NEXT_STATE is terminal
             next_qvals = self.dqn_frozen.fprop(next_states)
-            next_vs = np.zeros(self.minibatch_size)
+            next_vs = np.zeros(self.minibatch_size).astype(floatX)
             for idx in range(self.minibatch_size):
                 if idx not in terminals:
                     next_vs[idx] = np.max(next_qvals[idx, nvas[idx]])
@@ -475,7 +477,7 @@ class DeepQlearn(object):
             nn_error = []
             for nn_it in range(self.nn_num_iter):
                 error = self.bprop(states, actions, targets.flatten(), *reg_vs)
-                # print 'nn_it', nn_it, 'error', error
+                print 'nn_it', nn_it, 'error', error
                 nn_error.append(float(error))
             self.diagnostics['nn-error'].append(nn_error)
 
@@ -524,7 +526,7 @@ class DeepQlearn(object):
                 meta['last_valid_actions'] = task.valid_actions
                 meta['num_actions'] = task.num_actions
 
-                if num_steps >= np.log(tol) / np.log(self.gamma):
+                if self.gamma < 1. and num_steps >= np.log(tol) / np.log(self.gamma):
                     # print 'Lying and tell the agent the episode is over!'
                     meta['curr_valid_actions'] = []
                     self._end_episode(0, meta)
@@ -540,6 +542,9 @@ class DeepQlearn(object):
                 reward = task.step(action)
                 cum_reward += factor * reward
                 factor *= self.gamma
+
+                #print 'action', action
+                #print 'reward', reward, 'cum', cum_reward
 
                 meta['curr_valid_actions'] = task.valid_actions
 
