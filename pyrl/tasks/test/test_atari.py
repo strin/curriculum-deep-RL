@@ -4,6 +4,7 @@ from pyrl.prob import choice
 game = AtariGame('data/roms/pong.bin')
 while not game.is_end():
     a = choice(game.valid_actions, 1)[0]
+    print game.curr_state.shape
     game.step(a)
 
 
