@@ -148,3 +148,11 @@ def to_string(obj):
     else:
         raise TypeError('Unsupported type %s for to_string' % str(type(obj)))
 
+
+def rgb2yuv(pic):
+    pic = pic.astype(np.float32)
+    res = np.zeros_like(pic)
+    res[:, :, 0] = 0.299 * pic[:, :, 0] + 0.587 * pic[:, :, 1] + 0.114 * pic[:, :, 2]
+    res[:, :, 1] = -0.14713 * pic[:, :, 0] -0.28886 * pic[:, :, 1] + 0.436 * pic[:, :, 2]
+    res[:, :, 2] = 0.615 * pic[:, :, 0] -0.51499 * pic[:, :, 1] - 0.10001 * pic[:, :, 2]
+    return res
