@@ -298,7 +298,8 @@ class DeepQlearn(object):
     '''
     def __init__(self, dqn_mt, gamma=0.95, l2_reg=0.0, lr=1e-3,
                memory_size=250, minibatch_size=64,
-               nn_num_batch=1, nn_num_iter=2, regularizer={}):
+               nn_num_batch=1, nn_num_iter=2, regularizer={},
+               target_freq=10):
         '''
         (TODO): task should be task info.
         we don't use all of task properties/methods here.
@@ -306,8 +307,10 @@ class DeepQlearn(object):
         and we allow task switching.
         '''
         self.dqn = dqn_mt
+        self.dqn_frozen = dqn_mt.copy()
         self.l2_reg = l2_reg
         self.lr = lr
+        self.target_freq = target_freq
         self.memory_size = memory_size
         self.minibatch_size = minibatch_size
         self.gamma = gamma
@@ -334,6 +337,7 @@ class DeepQlearn(object):
         # compile back-propagtion network
         self._compile_bp()
 
+
     def copy(self):
         # copy dqn.
         dqn_mt = self.dqn.copy()
@@ -345,6 +349,7 @@ class DeepQlearn(object):
         learner.last_action = self.last_action
         learner._compile_bp()
         return learner
+
 
     def _compile_bp(self):
         states = self.dqn.states
@@ -396,6 +401,7 @@ class DeepQlearn(object):
             if self.exp_idx >= self.memory_size:
                 self.exp_idx = 0
 
+
     def _update_net(self):
         '''
             sample from the memory dataset and perform gradient descent on
@@ -438,7 +444,7 @@ class DeepQlearn(object):
 
             # compute target reward + \gamma max_{a'} Q(ns, a')
             # Ensure target = reward when NEXT_STATE is terminal
-            next_qvals = self.dqn.fprop(next_states)
+            next_qvals = self.dqn_frozen.fprop(next_states)
             next_vs = np.zeros(self.minibatch_size)
             for idx in range(self.minibatch_size):
                 if idx not in terminals:
@@ -473,6 +479,7 @@ class DeepQlearn(object):
                 nn_error.append(float(error))
             self.diagnostics['nn-error'].append(nn_error)
 
+
     def _learn(self, next_state, reward, next_valid_actions):
         '''
         need next_valid_actions to compute appropriate V = max_a Q(s', a).
@@ -480,6 +487,7 @@ class DeepQlearn(object):
         self._add_to_experience(self.last_state, self.last_action,
                                 next_state, reward, next_valid_actions)
         self._update_net()
+
 
     def _end_episode(self, reward, meta):
         if self.last_state is not None:
@@ -489,12 +497,16 @@ class DeepQlearn(object):
         self.last_state = None
         self.last_action = None
 
+
     def run(self, task, num_episodes=100, tol=1e-4, budget=None, callback=None, **kwargs):
         '''
         task: the task to run on.
-        num_episodes: how many episodes to repeat at maximum.
-        tol: tolerance in terms of reward signal.
-        budget: how many total steps to take.
+            num_episodes: how many episodes to repeat at maximum.
+            tol: tolerance in terms of reward signal.
+            budget: how many total steps to take.
+
+        note on stability:
+            first makes a snapshot of dqn, and use that to evaluate targets.
         '''
         cum_rewards = []
         total_steps = 0.
@@ -544,6 +556,9 @@ class DeepQlearn(object):
                 # call diagnostics callback if provided.
                 if callback:
                     callback(task)
+
+                if self.total_exp % self.target_freq == 0: # update target network.
+                    self.dqn_frozen = self.dqn.copy()
 
                 if task.is_end() or not has_next_state:
                     self._end_episode(reward, meta)

@@ -339,6 +339,11 @@ class DQN(Qfunc):
                                      outputs=self.action_values,
                                      name='fprop')
 
+    def copy(self):
+        import dill as pickle
+        return pickle.loads(pickle.dumps(self))
+
+
     def apply(self, states, actions):
         '''
         states: any matrix / tensor that fits the arch_func, expect the first dimension
