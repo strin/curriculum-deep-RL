@@ -3,6 +3,8 @@ import theano
 import theano.tensor as T
 from theano.tensor.signal.downsample import max_pool_2d
 
+from pyrl.config import floatX
+
 class FullyConnected(object):
     def __init__(self, input_dim, output_dim, activation='relu'):
         '''
@@ -27,16 +29,18 @@ class FullyConnected(object):
 
         # initialize weight matrix W of size (input_dim, output_dim)
         std_dev = np.sqrt(0.2 / input_dim)
-        W_init = std_dev * np.random.randn(input_dim, output_dim)
+        W_init = std_dev * np.random.randn(input_dim, output_dim).astype(floatX)
         W = theano.shared(value=W_init, name='W')
 
         # initialize bias vector b of size (output_dim, 1)
-        b_init = np.zeros((1, output_dim))
+        b_init = np.zeros((1, output_dim)).astype(floatX)
         b = theano.shared(value=b_init, name='b', broadcastable=(True, False))
 
         # store parameters
         self.W = W
         self.b = b
+        self.input_dim = input_dim
+        self.output_dim = output_dim
         self.params = [self.W, self.b]
 
     def __call__(self, inputs):
@@ -53,6 +57,57 @@ class FullyConnected(object):
         for p in self.params:
             p.set_value(params[p.name], borrow=True)
 
+
+class Conv2D(object):
+    '''
+    convolution layers.
+    '''
+    def __init__(self, input_dim, output_dim, filter_size = (2, 2), stride=(1, 1),
+                 activation='relu', border_mode='valid'):
+        if activation is None:
+            self.act = lambda x: x
+        elif activation is 'relu':
+            self.act = lambda x: T.maximum(x, 0)
+        elif activation is 'tanh':
+            self.act = lambda x: T.tanh(x)
+        else:
+            raise NotImplementedError()
+
+        # initialize weight matrix W of size (input_dim, output_dim)
+        std_dev = np.sqrt(2. / (input_dim * filter_size[0] * filter_size[1]))
+        W_init = std_dev * np.random.randn(output_dim, input_dim, filter_size[0], filter_size[1]).astype(floatX)
+        W = theano.shared(value=W_init, name='W')
+
+        # initialize bias vector b of size (output_dim, 1)
+        b_init = np.zeros((output_dim)).astype(floatX)
+        b = theano.shared(value=b_init, name='b')
+
+        # store parameters
+        self.W = W
+        self.b = b
+        self.input_dim = input_dim
+        self.output_dim = output_dim
+        self.stride = stride
+        self.filter_size = filter_size
+        self.border_mode = border_mode
+        self.params = [self.W, self.b]
+
+    def __call__(self, inputs):
+        # set-up the outputs
+        conv_out = self.act(T.nnet.conv.conv2d(inputs, self.W, subsample=self.stride,
+                                               border_mode=self.border_mode)
+                            + self.b.dimshuffle('x', 0, 'x', 'x'))
+        return conv_out
+
+    def get_params(self):
+        params = {}
+        for p in self.params:
+            params[p.name] = p.get_value()
+        return params
+
+    def set_params(self, params):
+        for p in self.params:
+            p.set_value(params[p.name], borrow=True)
 
 class Conv(object):
     '''
@@ -98,7 +153,7 @@ class Conv(object):
 
     def __call__(self, inputs):
         # set-up the outputs
-        conv_out = T.nnet.conv.conv2d(inputs, self.W, border_mode=self.border_mode) + self.b.dimshuffle('x', 0, 'x', 'x')
+        conv_out = self.act(T.nnet.conv.conv2d(inputs, self.W, border_mode=self.border_mode) + self.b.dimshuffle('x', 0, 'x', 'x'))
         pool_out = max_pool_2d(input=conv_out, ds=self.pool_size, ignore_border=True)
         return pool_out
 
