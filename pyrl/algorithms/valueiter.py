@@ -387,7 +387,8 @@ class DeepQlearn(object):
         td_errors = T.sqrt(mse)
         self.bprop = theano.function(inputs=[states, last_actions, targets] + reg_vs,
                                      outputs=td_errors, updates=updates,
-                                     allow_input_downcast=True)
+                                     allow_input_downcast=True,
+                                     on_unused_input='ignore')
 
     def _add_to_experience(self, s, a, ns, r, meta):
         # TODO: improve experience replay mechanism by making it harder to
@@ -477,7 +478,7 @@ class DeepQlearn(object):
             nn_error = []
             for nn_it in range(self.nn_num_iter):
                 error = self.bprop(states, actions, targets.flatten(), *reg_vs)
-                print 'nn_it', nn_it, 'error', error
+                #print 'nn_it', nn_it, 'error', error
                 nn_error.append(float(error))
             self.diagnostics['nn-error'].append(nn_error)
 
@@ -526,11 +527,11 @@ class DeepQlearn(object):
                 meta['last_valid_actions'] = task.valid_actions
                 meta['num_actions'] = task.num_actions
 
-                if self.gamma < 1. and num_steps >= np.log(tol) / np.log(self.gamma):
-                    # print 'Lying and tell the agent the episode is over!'
-                    meta['curr_valid_actions'] = []
-                    self._end_episode(0, meta)
-                    break
+                # print 'Lying and tell the agent the episode is over!'
+                #if self.gamma < 1. and num_steps >= np.log(tol) / np.log(self.gamma):
+                #    meta['curr_valid_actions'] = []
+                #    self._end_episode(0, meta)
+                #    break
 
                 action = self.dqn.get_action(curr_state, valid_actions=task.valid_actions, **kwargs)
                 if 'uct' in kwargs: # update uct.

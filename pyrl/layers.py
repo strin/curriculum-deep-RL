@@ -2,6 +2,7 @@ import numpy as np
 import theano
 import theano.tensor as T
 from theano.tensor.signal.downsample import max_pool_2d
+from theano.sandbox.cuda.dnn import dnn_conv
 
 from pyrl.config import floatX
 
@@ -94,7 +95,10 @@ class Conv2D(object):
 
     def __call__(self, inputs):
         # set-up the outputs
-        conv_out = self.act(T.nnet.conv.conv2d(inputs, self.W, subsample=self.stride,
+        #conv_out = self.act(T.nnet.conv.conv2d(inputs, self.W, subsample=self.stride,
+        #                                       border_mode=self.border_mode)
+        #                    + self.b.dimshuffle('x', 0, 'x', 'x'))
+        conv_out = self.act(dnn_conv(inputs, self.W, subsample=self.stride,
                                                border_mode=self.border_mode)
                             + self.b.dimshuffle('x', 0, 'x', 'x'))
         return conv_out

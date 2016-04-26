@@ -5,6 +5,7 @@ from pyrl.utils import rgb2yuv
 from pyrl.prob import choice
 from pyrl.config import floatX
 from scipy.misc import imresize
+import sys
 
 from ale_python_interface import ALEInterface
 
@@ -12,23 +13,29 @@ class AtariGame(Task):
     ''' RL task based on Arcade Game.
     '''
 
-    def __init__(self, rom_path, num_frames=4, live=False):
+    def __init__(self, rom_path, num_frames=4, live=False, skip_frame=0):
         self.ale = ALEInterface()
         if live:
-            if sys.platform == 'darwin':
-                import pygame
-                pygame.init()
-                self.ale.setBool('sound', False) # Sound doesn't work on OSX
-            elif sys.platform.startswith('linux'):
-                self.ale.setBool('sound', True)
+            USE_SDL = True
+            if USE_SDL:
+                if sys.platform == 'darwin':
+                    import pygame
+                    pygame.init()
+                    self.ale.setBool('sound', False) # Sound doesn't work on OSX
+                elif sys.platform.startswith('linux'):
+                    self.ale.setBool('sound', True)
             self.ale.setBool('display_screen', True)
         self.live = live
         self.ale.loadROM(rom_path)
         self.num_frames = num_frames
         self.frames = []
+        self.frame_id = 0
+        self.cum_reward = 0
+        self.skip_frame = skip_frame
         self.img_shape = (84, 84) # image shape according to DQN Nature paper.
         while len(self.frames) < 4:
             self.step(choice(self.valid_actions, 1)[0])
+        self.reset()
 
 
     def copy(self):
@@ -38,6 +45,11 @@ class AtariGame(Task):
 
     def reset(self):
         self.ale.reset_game()
+        self.frame_id = 0
+        self.cum_reward = 0
+        if self.skip_frame:
+            for frame_i in range(self.skip_frame):
+                self.step(choice(self.valid_actions, 1)[0])
 
 
     @property
@@ -76,11 +88,25 @@ class AtariGame(Task):
         if len(self.frames) == self.num_frames:
             self.frames = self.frames[1:]
         self.frames.append(self._curr_frame)
+        self.frame_id += 1
+        #print 'frame_id', self.frame_id
+        self.cum_reward += reward
         return reward
 
 
     def is_end(self):
+        if np.abs(self.cum_reward) > 0:
+            return True
         return self.ale.game_over()
 
 
+    def visualize(self, fig=1, fname=None, format='png'):
+        fig = plt.figure(fig, figsize=(5,5))
+        plt.clf()
+        plt.imshow(self.getScreenRGB())
+        if fname:
+            plt.savefig(fname, format=format)
+        else:
+            plt.show()
+        return res
 
