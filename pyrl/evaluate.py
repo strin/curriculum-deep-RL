@@ -46,8 +46,9 @@ def estimate_temperature(policy, states, valid_actions, entropy = 0.3, tol=1e-1)
                 temperature_left = temperature
 
         if iteration >= 10000:
-            #print '[warning] temperature, too many iterations', temperature
+            print '[warning] temperature, too many iterations', temperature
             print prob
+            return temperature
         iteration += 1
 
 
@@ -59,7 +60,7 @@ def reward_search_samples(search_func, task, num_trials=10, gamma=0.95, tol=1e-2
         task.reset()
         reward = 0.
         factor = 1.
-        while num_steps < np.log(tol) / np.log(gamma):
+        while gamma == 1. or num_steps < np.log(tol) / np.log(gamma):
             curr_state = task.curr_state
 
             if callback:
@@ -97,7 +98,7 @@ def reward_stochastic_softmax_samples(policy, task, gamma=0.95, num_trials = 100
         task.reset()
         reward = 0.
         factor = 1.
-        while num_steps < np.log(tol) / np.log(gamma):
+        while gamma == 1. or num_steps < np.log(tol) / np.log(gamma):
             curr_state = task.curr_state
             if callback:
                 callback(task)
@@ -127,7 +128,7 @@ def reward_stochastic_samples(policy, task, gamma=0.95, num_trials = 100, budget
         task.reset()
         reward = 0.
         factor = 1.
-        while num_steps < np.log(tol) / np.log(gamma):
+        while gamma == 1. or num_steps < np.log(tol) / np.log(gamma):
             if task.is_end():
                 break
 

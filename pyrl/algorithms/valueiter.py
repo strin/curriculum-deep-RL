@@ -300,7 +300,7 @@ class DeepQlearn(object):
     def __init__(self, dqn_mt, gamma=0.95, l2_reg=0.0, lr=1e-3,
                memory_size=250, minibatch_size=64,
                nn_num_batch=1, nn_num_iter=2, regularizer={},
-               target_freq=10):
+               target_freq=10, skip_frame=0):
         '''
         (TODO): task should be task info.
         we don't use all of task properties/methods here.
@@ -316,6 +316,7 @@ class DeepQlearn(object):
         self.minibatch_size = minibatch_size
         self.gamma = floatX(gamma)
         self.regularizer = regularizer
+        self.skip_frame = skip_frame
 
         # for now, keep experience as a list of tuples
         self.experience = []
@@ -413,6 +414,8 @@ class DeepQlearn(object):
         # don't update the network until sufficient experience has been
         # accumulated
         # removing this might cause correlation for early samples. suggested to be used in curriculums.
+        if self.total_exp < self.skip_frame:
+            return
         #if len(self.experience) < self.memory_size:
         #    return
         for nn_bi in range(self.nn_num_batch):
@@ -455,10 +458,10 @@ class DeepQlearn(object):
 
             targets = rewards + self.gamma * next_vs
 
-            if (targets > 100.).any():
-                print 'error, target > 1', targets
-                print 'rewards', rewards
-                print 'next_vs', next_vs
+            #if (targets > 100.).any():
+            #    print 'error, target > 1', targets
+            #    print 'rewards', rewards
+            #    print 'next_vs', next_vs
 
             # regularizations.
             reg_vs = []

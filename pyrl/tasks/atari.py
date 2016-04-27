@@ -5,6 +5,7 @@ from pyrl.utils import rgb2yuv
 from pyrl.prob import choice
 from pyrl.config import floatX
 from scipy.misc import imresize
+from scipy.ndimage.filters import gaussian_filter
 import sys
 
 from ale_python_interface import ALEInterface
@@ -13,7 +14,7 @@ class AtariGame(Task):
     ''' RL task based on Arcade Game.
     '''
 
-    def __init__(self, rom_path, num_frames=4, live=False, skip_frame=0):
+    def __init__(self, rom_path, num_frames=4, live=False, skip_frame=0, mode='small'):
         self.ale = ALEInterface()
         if live:
             USE_SDL = True
@@ -25,6 +26,7 @@ class AtariGame(Task):
                 elif sys.platform.startswith('linux'):
                     self.ale.setBool('sound', True)
             self.ale.setBool('display_screen', True)
+        self.mode = mode
         self.live = live
         self.ale.loadROM(rom_path)
         self.num_frames = num_frames
@@ -32,7 +34,10 @@ class AtariGame(Task):
         self.frame_id = 0
         self.cum_reward = 0
         self.skip_frame = skip_frame
-        self.img_shape = (84, 84) # image shape according to DQN Nature paper.
+        if mode == 'small':
+            self.img_shape = (16, 16)
+        else:
+            self.img_shape = (84, 84) # image shape according to DQN Nature paper.
         while len(self.frames) < 4:
             self.step(choice(self.valid_actions, 1)[0])
         self.reset()
@@ -55,6 +60,9 @@ class AtariGame(Task):
     @property
     def _curr_frame(self):
         img = self.ale.getScreenRGB()
+        # print 'RAM', self.ale.getRAM()
+        if self.mode == 'small':
+            img = gaussian_filter(img, sigma=4)
         img = imresize(img, self.img_shape, interp='bilinear')
         return rgb2yuv(img)[:, :, 0] # get Y channel, according to Nature paper.
 
@@ -64,13 +72,12 @@ class AtariGame(Task):
         '''
         return raw pixels.
         '''
-        return np.array(self.frames, dtype=floatX)
+        return np.array(self.frames, dtype=floatX) / floatX(255.) # normalize
 
 
     @property
     def state_shape(self):
-        (screenH, screenW) = self.ale.getScreenDims()
-        return (screenH, screenW, 3)
+        return self.curr_state.shape
 
 
     @property
@@ -101,9 +108,11 @@ class AtariGame(Task):
 
 
     def visualize(self, fig=1, fname=None, format='png'):
+        import matplotlib.pyplot as plt
         fig = plt.figure(fig, figsize=(5,5))
         plt.clf()
-        plt.imshow(self.getScreenRGB())
+        plt.axis('off')
+        res = plt.imshow(self.ale.getScreenRGB())
         if fname:
             plt.savefig(fname, format=format)
         else:
