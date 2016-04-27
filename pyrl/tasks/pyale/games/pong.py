@@ -54,8 +54,12 @@ bar1_score, bar2_score = 0,0
 clock = pygame.time.Clock()
 font = pygame.font.SysFont("calibri",40)
 
+from pyrl.tasks.pyale.ale import SyncEvent
+
+event = SyncEvent()
+
 while True:
-    for event in pygame.event.get():
+    for event in event.get():
         if event.type == QUIT:
             exit()
         if event.type == KEYDOWN:
