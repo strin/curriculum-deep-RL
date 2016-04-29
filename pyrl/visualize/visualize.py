@@ -81,6 +81,47 @@ class VideoRecorder(object):
         self.movie.communicate()
         self.finished = True
 
+
+class RawVideoRecorder(object):
+    '''
+    record a video from pygame session.
+    requires ffmpeg.
+    '''
+    FFMPEG_BIN = 'ffmpeg'
+
+    def __init__(self, fname, screen_size):
+        self.output = open('_video_recorder.out', 'w')
+
+        mkdir_if_not_exist(os.path.dirname(fname))
+        command = [ VideoRecorder.FFMPEG_BIN,
+            '-y', # (optional) overwrite output file if it exists
+            '-f', 'rawvideo',
+            '-vcodec','rawvideo',
+            '-s', '%sx%s' % (screen_size[0], screen_size[1]), # size of one frame
+            '-pix_fmt', 'rgb24',
+            '-r', '24', # frames per second
+            '-i', '-', # The input comes from a pipe
+            '-an', # Tells FFMPEG not to expect any audio
+            '-vcodec', 'mpeg4',
+            fname ]
+
+        movie = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=self.output, stderr=self.output)
+
+        self.movie = movie
+        self.finished = False
+
+
+    def write_frame(self, data):
+        if self.finished:
+            return
+        self.movie.stdin.write(data)
+
+
+    def stop(self):
+        self.movie.communicate()
+        self.finished = True
+
+
 def html_embed_mp4(video_path, style=''):
     VIDEO_TAG = """<video controls style="%(style)s">
      <source src="data:video/x-m4v;base64,{0}" type="video/mp4">

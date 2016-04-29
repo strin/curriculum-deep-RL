@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 #
 #       This program is free software; you can redistribute it and/or modify
 #       it under the terms of the GNU General Public License as published by
@@ -13,25 +12,27 @@
 #		It's my first actual game-making attempt. I know code could be much better
 #		with classes or defs but I tried to make it short and understandable with very
 #		little knowledge of python and pygame(I'm one of them). Enjoy.
-
 import pygame
 from pygame.locals import *
 from sys import exit
 import random
 
 pygame.init()
+pygame.font.init()
 pygame.display.set_caption("Pong Pong!")
 
 
 screen=pygame.display.set_mode((640,480),0,32)
 
 W = 40
-H1 = 200
+H1 = 50
 H2 = 50
 C = 15
 
 #Creating 2 bars, a ball and background.
-back = pygame.Surface((640,480))
+height = 480
+width = 640
+back = pygame.Surface((width,height))
 background = back.convert()
 background.fill((0,0,0))
 bar1 = pygame.Surface((10,H1)).convert()
@@ -43,23 +44,57 @@ circ = pygame.draw.circle(circ_sur,(0,255,0),(C/2,C/2),C/2)
 circle = circ_sur.convert()
 circle.set_colorkey((0,0,0))
 
+
 # some definitions
 bar1_x, bar2_x = 10 , 620.
 bar1_y, bar2_y = 215. , 215.
 circle_x, circle_y = 307.5, 232.5
 bar1_move, bar2_move = 0. , 0.
 speed_x, speed_y, speed_circ, speed_ai = 250., 250., 250., 150
+ai_speed = 0.
 bar1_score, bar2_score = 0,0
+
 #clock and font objects
 clock = pygame.time.Clock()
-font = pygame.font.SysFont("calibri",40)
+# font = pygame.font.SysFont("calibri",40)
 
-from pyrl.tasks.pyale.ale import SyncEvent
+try:
+    # hook for ALE.
+    import sys, os
+    sys.path.append(os.environ["PYRL"])
+    from pyrl.tasks.pyale import SyncEvent
+    _event = SyncEvent()
+    get_event = lambda: _event.get()
+    _event.mount('valid_events', lambda: [(KEYDOWN, K_UP), (KEYDOWN, K_DOWN),
+                                          (KEYUP, K_UP), (KEYUP, K_DOWN)]
+                )
+    _event.mount('score', lambda: bar1_score - bar2_score)
+    _event.mount('screen', lambda: {
+        'width': width,
+        'height': height,
+        'data': pygame.image.tostring(screen, 'RGB')
+    })
+    _event.mount('state', lambda: {
+        'y1a': bar1_y,
+        'y1b': bar1_y + H1 / 2.,
+        'y2a': bar2_y,
+        'y2b': bar2_y + H2 / 2.,
+        'cx': circle_x,
+        'cy': circle_y
+    })
 
-event = SyncEvent()
+
+except Exception as e:
+    #import traceback
+    #with open('tmp.txt', 'w') as f:
+    #    import os
+    #    print>>f, '[warning] use pygame events:', e.message, sys.path
+    #    traceback.print_exc(file=f)
+    get_event = lambda: pygame.event.get()
 
 while True:
-    for event in event.get():
+    for event in get_event():
+        #print>>f, event.type, event.key
         if event.type == QUIT:
             exit()
         if event.type == KEYDOWN:
@@ -73,8 +108,8 @@ while True:
             elif event.key == K_DOWN:
                 bar1_move = 0.
 
-    score1 = font.render(str(bar1_score), True,(255,255,255))
-    score2 = font.render(str(bar2_score), True,(255,255,255))
+    #score1 = font.render(str(bar1_score), True,(255,255,255))
+    #score2 = font.render(str(bar2_score), True,(255,255,255))
 
     screen.blit(background,(0,0))
     frame = pygame.draw.rect(screen,(255,255,255),Rect((5,5),(630,470)),2)
@@ -82,13 +117,14 @@ while True:
     screen.blit(bar1,(bar1_x,bar1_y))
     screen.blit(bar2,(bar2_x,bar2_y))
     screen.blit(circle,(circle_x,circle_y))
-    screen.blit(score1,(250.,210.))
-    screen.blit(score2,(380.,210.))
+    #screen.blit(score1,(250.,210.))
+    #screen.blit(score2,(380.,210.))
 
     bar1_y += bar1_move
 
 # movement of circle
-    time_passed = clock.tick(30)
+    #clock.tick(30)
+    time_passed = 30
     time_sec = time_passed / 1000.0
 
     circle_x += speed_x * time_sec
@@ -119,6 +155,8 @@ while True:
             speed_x = -speed_x
     if circle_x < 5.:
         bar2_score += 1
+        circle_x, circle_y = 307.5, 232.5
+        bar1_y, bar2_y = 215., 215.
     elif circle_x > 620.:
         bar1_score += 1
         circle_x, circle_y = 307.5, 232.5

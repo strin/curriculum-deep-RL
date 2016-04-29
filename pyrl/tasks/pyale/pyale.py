@@ -1,66 +1,24 @@
 from pyrl.common import *
 from pyrl.tasks.task import Task
-from pyrl.utils import rgb2yuv
+from pyrl.utils import rgb2yuv, Timer
 from pyrl.prob import choice
 from pyrl.config import floatX
 from scipy.misc import imresize
 from scipy.ndimage.filters import gaussian_filter
 import sys
-import pexpect
+import pexpect.popen_spawn
+import subprocess
 import dill
 import base64
 import select
 
-
 import pygame
 import pygame.image
 from pygame.event import Event
+from pygame.locals import *
 
-class AsyncEvent(object):
-    '''
-    async event, wrapper around pygame.event
-    '''
-    def get(self):
-        return pygame.event.get()
-
-    def mount(self, message_type, func):
-        pass # ignore.
-
-
-class SyncEvent(object):
-    '''
-    synchronous event, used for MDP.
-    '''
-    def __init__(self):
-        print 'sync __init__'
-        self.stdout = sys.stdout
-        self.stderr = sys.stderr
-        sys.stdout = open('octopus.out', 'w')
-        sys.stderr = open('octopus.err', 'w')
-        self.mounted = {}
-
-
-    def get(self):
-        for event in pygame.event.get(): # first yield all pygame events, such as window active.
-            yield event
-
-        while sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
-        #while True: # loop until a GO event is emitted.
-            raw_message = sys.stdin.readline()
-            message = dill.loads(base64.b64decode(raw_message))
-            print 'new message', message
-            if message['type'] == 'event':
-                yield Event(message['event_type'], {
-                    'key': message['key']
-                })
-            elif message['type'] in self.mounted:
-                func = self.mounted[message['type']]
-                ret = func()
-                self.stdout.write('output>'+ encode_obj(ret) + '\r\n')
-
-
-    def mount(self, message_type, func):
-        self.mounted[message_type] = func
+from scipy.misc import imread
+from StringIO import StringIO
 
 
 def encode_obj(obj):
@@ -78,25 +36,155 @@ def decode_obj(obj):
     return dill.loads(base64.b64decode(obj))
 
 
+class AsyncEvent(object):
+    '''
+    async event, wrapper around pygame.event
+    '''
+    def get(self):
+        return pygame.event.get()
+
+    def mount(self, message_type, func):
+        pass # ignore.
+
+
+def respond_ale(stdout, ret):
+    stdout.write('>' + encode_obj(ret) + '\r\n')
+
+
+def respond_ok(stdout):
+    respond_ale(stdout, 'ok')
+
+
+class SyncEvent(object):
+    '''
+    synchronous event, used for MDP.
+    '''
+    def __init__(self):
+        self.stdout = sys.stdout
+        self.stderr = sys.stderr
+        sys.stdout = open('game.out', 'w')
+        sys.stderr = open('game.err', 'w')
+        self.mounted = {}
+        self.frames_togo = 0
+
+
+    def get(self):
+        for event in pygame.event.get(): # first yield all pygame events, such as window active.
+            yield event
+
+        if self.frames_togo > 0: # if in state 'go', skip interaction with ALE.
+            self.frames_togo -= 1
+            if self.frames_togo == 0:
+                respond_ok(self.stdout)
+
+        elif 'ALE' in os.environ:  # Arcade leanring experiment.
+            while sys.stdin in select.select([sys.stdin], [], [], 99999)[0]:
+                raw_message = sys.stdin.readline()
+                message = decode_obj(raw_message)
+                if message['type'] == 'event':
+                    yield Event(message['event'][0], {
+                        'key': message['event'][1]
+                    })
+                    respond_ok(self.stdout)
+                elif message['type'] == 'go':
+                    self.frames_togo = message['frame']
+                    break
+                elif message['type'] in self.mounted:
+                    func = self.mounted[message['type']]
+                    ret = func()
+                    respond_ale(self.stdout, ret)
+
+
+    def mount(self, message_type, func):
+        self.mounted[message_type] = func
+
+
 def query_process(process, message):
     process.sendline(encode_obj(message))
-    process.expect('output>')
+    process.expect('>')
     raw_data = process.readline()
-    return decode_obj(raw_data)
+    data = decode_obj(raw_data)
+    return data
+
+
+def tell_process(process, message):
+    resp = query_process(process, message)
+    assert(resp == 'ok')
+
+
+def query_valid_events(process):
+    return query_process(process, {
+            'type': 'valid_events'
+        })
+
+
+def query_process_score(process):
+    return query_process(process, {
+            'type': 'score'
+        })
+
+
+def query_process_screen(process):
+    img_data = query_process(process, {
+            'type': 'screen'
+        })
+    return img_data['data']
+
+
+def query_process_state(process):
+    return query_process(process, {
+            'type': 'state'
+        })
+
+
+def tell_process_event(process, event):
+    return tell_process(process, {
+            'type': 'event',
+            'event': event
+        })
+
+
+def tell_process_go(process, num_frames):
+    return tell_process(process, {
+            'type': 'go',
+            'frame': num_frames
+        })
+
 
 
 class PythonGame(Task):
-    def __init__(self, game_path):
+    def __init__(self, game_path, frames_per_action=1):
+        '''
+        go_frame: how many frames each action last.
+        '''
+        self.game_path = os.path.join(os.path.dirname(__file__),
+                     'games',
+                     game_path
+                     )
+        self.pyrl_root = __file__[:__file__.find('pyrl/tasks/pyale')-1]
         self.game_process = None
+        self.frames_per_action = frames_per_action
         self.num_reset = 0
-        self.game_path = game_path
         self.curr_score = 0.
+        self.img_shape = (84, 84)
+        self.reset()
+        self.valid_events = query_valid_events(self.game_process)
 
 
     def reset(self):
         self.terminate()
         self.num_reset += 1
-        self.game_process = pexpect.spawn('python %s' % self.game_path, maxread=999999)
+        env = {"ALE": "true",
+                "PYRL": self.pyrl_root + '/',
+                }
+        env.update({key: os.environ[key] for key in os.environ.keys()})
+        self.game_process = pexpect.spawn('python %s' % self.game_path,
+                                          maxread=9999999,
+                                          env=env)
+        #self.game_process = subprocess.Popen(['python', self.game_path],
+        #                                     bufsize=-1,
+        #                                     stdin=subprocess.PIPE,
+        #                                     stdout=subprocess.PIPE)
 
 
     def is_end(self):
@@ -110,11 +198,8 @@ class PythonGame(Task):
 
     @property
     def _curr_rgb_screen(self):
-        img = query_process(self.game_process, {
-            'type': 'state'
-        })
-        img = imresize(img, self.img_shape, interp='bilinear')
-        return img
+        raise NotImplementedError('rgb input not defined')
+
 
     @property
     def _curr_frame(self):
@@ -127,7 +212,7 @@ class PythonGame(Task):
         '''
         return raw pixels.
         '''
-        return np.array(self.frames, dtype=floatX) / floatX(255.) # normalize
+        return query_process_state(self.game_process)
 
 
     @property
@@ -142,19 +227,17 @@ class PythonGame(Task):
 
     @property
     def valid_actions(self):
-        return query_process(self.game_process, {
-            'type': 'valid_actions':
-        }
+        return range(len(self.valid_events))
 
 
     def step(self, action):
         assert(action >= 0 and action < self.num_actions)
-        score = query_process(self.game_process, {
-            'type': 'action',
-            'action': action
-        })
-
+        event = self.valid_events[action]
+        tell_process_event(self.game_process, event)
+        tell_process_go(self.game_process, self.frames_per_action)
+        score = query_process_score(self.game_process)
         reward = score - self.curr_score
+        self.curr_score = score
         return reward
 
 
@@ -170,3 +253,7 @@ class PythonGame(Task):
             plt.show()
         return res
 
+
+    def visualize_raw(self):
+        data = query_process_screen(self.game_process)
+        return data
