@@ -69,6 +69,7 @@ try:
                                           (KEYUP, K_UP), (KEYUP, K_DOWN)]
                 )
     _event.mount('score', lambda: bar1_score - bar2_score)
+    _event.mount('is_end', lambda: bar1_score >= 1 or bar2_score >= 1)
     _event.mount('screen', lambda: {
         'width': width,
         'height': height,

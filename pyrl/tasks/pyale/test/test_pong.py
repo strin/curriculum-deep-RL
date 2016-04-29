@@ -15,6 +15,7 @@ for it in range(100):
     action = choice(range(game.num_actions), 1)[0]
     reward = game.step(action)
     print 'state', game.curr_state
+    print 'is_end', game.is_end()
     #vr.write_frame(game.visualize_raw())
     print 'action', action, 'reward', reward
 vr.stop()

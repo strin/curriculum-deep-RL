@@ -49,6 +49,7 @@ class AsyncEvent(object):
 
 def respond_ale(stdout, ret):
     stdout.write('>' + encode_obj(ret) + '\r\n')
+    stdout.flush()
 
 
 def respond_ok(stdout):
@@ -78,21 +79,24 @@ class SyncEvent(object):
                 respond_ok(self.stdout)
 
         elif 'ALE' in os.environ:  # Arcade leanring experiment.
-            while sys.stdin in select.select([sys.stdin], [], [], 99999)[0]:
-                raw_message = sys.stdin.readline()
-                message = decode_obj(raw_message)
-                if message['type'] == 'event':
-                    yield Event(message['event'][0], {
-                        'key': message['event'][1]
-                    })
-                    respond_ok(self.stdout)
-                elif message['type'] == 'go':
-                    self.frames_togo = message['frame']
-                    break
-                elif message['type'] in self.mounted:
-                    func = self.mounted[message['type']]
-                    ret = func()
-                    respond_ale(self.stdout, ret)
+            while self.frames_togo == 0: # wait for 'go' signal.
+                while sys.stdin in select.select([sys.stdin], [], [], 99999)[0]:
+                    raw_message = sys.stdin.readline()
+                    message = decode_obj(raw_message)
+                    if message['type'] == 'event':
+                        yield Event(message['event'][0], {
+                            'key': message['event'][1]
+                        })
+                        respond_ok(self.stdout)
+                    elif message['type'] == 'go':
+                        self.frames_togo = message['frame']
+                        break
+                    elif message['type'] in self.mounted:
+                        func = self.mounted[message['type']]
+                        ret = func()
+                        respond_ale(self.stdout, ret)
+                        if message['type'] == 'is_end' and ret == True:
+                            exit(0)   # terminate the game.
 
 
     def mount(self, message_type, func):
@@ -121,6 +125,12 @@ def query_valid_events(process):
 def query_process_score(process):
     return query_process(process, {
             'type': 'score'
+        })
+
+
+def query_process_is_end(process):
+    return query_process(process, {
+            'type': 'is_end'
         })
 
 
@@ -165,7 +175,6 @@ class PythonGame(Task):
         self.game_process = None
         self.frames_per_action = frames_per_action
         self.num_reset = 0
-        self.curr_score = 0.
         self.img_shape = (84, 84)
         self.reset()
         self.valid_events = query_valid_events(self.game_process)
@@ -173,6 +182,8 @@ class PythonGame(Task):
 
     def reset(self):
         self.terminate()
+        self.has_ended = False
+        self.curr_score = 0.
         self.num_reset += 1
         env = {"ALE": "true",
                 "PYRL": self.pyrl_root + '/',
@@ -188,7 +199,11 @@ class PythonGame(Task):
 
 
     def is_end(self):
-        return not self.game_process.isalive()
+        if self.has_ended:
+            return True
+        is_end = query_process_is_end(self.game_process)
+        self.has_ended = is_end
+        return is_end
 
 
     def terminate(self):
@@ -231,6 +246,8 @@ class PythonGame(Task):
 
 
     def step(self, action):
+        if self.has_ended:
+            assert(False)
         assert(action >= 0 and action < self.num_actions)
         event = self.valid_events[action]
         tell_process_event(self.game_process, event)
@@ -241,17 +258,17 @@ class PythonGame(Task):
         return reward
 
 
-    def visualize(self, fig=1, fname=None, format='png'):
-        import matplotlib.pyplot as plt
-        fig = plt.figure(fig, figsize=(5,5))
-        plt.clf()
-        plt.axis('off')
-        res = plt.imshow(self._curr_rgb_screen)
-        if fname:
-            plt.savefig(fname, format=format)
-        else:
-            plt.show()
-        return res
+    #def visualize(self, fig=1, fname=None, format='png'):
+    #    import matplotlib.pyplot as plt
+    #    fig = plt.figure(fig, figsize=(5,5))
+    #    plt.clf()
+    #    plt.axis('off')
+    #    res = plt.imshow(self._curr_rgb_screen)
+    #    if fname:
+    #        plt.savefig(fname, format=format)
+    #    else:
+    #        plt.show()
+    #    return res
 
 
     def visualize_raw(self):

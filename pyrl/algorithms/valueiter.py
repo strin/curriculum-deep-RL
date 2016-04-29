@@ -553,6 +553,8 @@ class DeepQlearn(object):
                 self.last_action = action
 
                 reward = task.step(action)
+                print 'curr_state', self.last_state
+                print 'is_end', task.is_end()
                 cum_reward += factor * reward
                 factor *= self.gamma
 

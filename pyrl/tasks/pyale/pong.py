@@ -13,7 +13,7 @@ class PongGame(PythonGame):
         self.state_type = state_type
         self.curr_raw_state = self.curr_state
 
-        while len(self.frames):
+        while len(self.frames) < self.num_frames:
             self.step(choice(self.valid_actions, 1)[0])
             if self.is_end():
                 self.reset()
