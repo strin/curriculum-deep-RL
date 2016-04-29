@@ -8,13 +8,17 @@ from scipy.misc import imresize
 from scipy.ndimage.filters import gaussian_filter
 import sys
 
+from theano.tensor.signal.downsample import max_pool_2d
+import theano.tensor as T
+import theano
+
 from ale_python_interface import ALEInterface
 
 class AtariGame(Task):
     ''' RL task based on Arcade Game.
     '''
 
-    def __init__(self, rom_path, num_frames=4, live=False, skip_frame=0, mode='small'):
+    def __init__(self, rom_path, num_frames=4, live=False, skip_frame=0, mode='normal'):
         self.ale = ALEInterface()
         if live:
             USE_SDL = True
@@ -35,6 +39,8 @@ class AtariGame(Task):
         self.cum_reward = 0
         self.skip_frame = skip_frame
         if mode == 'small':
+            img = T.matrix('img')
+            self.max_pool = theano.function([img], max_pool_2d(img, [4, 4]))
             self.img_shape = (16, 16)
         else:
             self.img_shape = (84, 84) # image shape according to DQN Nature paper.
@@ -60,11 +66,12 @@ class AtariGame(Task):
     @property
     def _curr_frame(self):
         img = self.ale.getScreenRGB()
+        img = rgb2yuv(img)[:, :, 0] # get Y channel, according to Nature paper.
         # print 'RAM', self.ale.getRAM()
         if self.mode == 'small':
-            img = gaussian_filter(img, sigma=4)
-        img = imresize(img, self.img_shape, interp='bilinear')
-        return rgb2yuv(img)[:, :, 0] # get Y channel, according to Nature paper.
+            img = self.max_pool(img)
+        img = imresize(img, self.img_shape, interp='bicubic')
+        return  img
 
 
     @property
@@ -98,7 +105,7 @@ class AtariGame(Task):
         self.frame_id += 1
         #print 'frame_id', self.frame_id
         self.cum_reward += reward
-        return reward
+        return reward # TODO: scale the gradient up.
 
 
     def is_end(self):
@@ -112,7 +119,8 @@ class AtariGame(Task):
         fig = plt.figure(fig, figsize=(5,5))
         plt.clf()
         plt.axis('off')
-        res = plt.imshow(self.ale.getScreenRGB())
+        #res = plt.imshow(self.ale.getScreenRGB())
+        res = plt.imshow(self._curr_frame, interpolation='none')
         if fname:
             plt.savefig(fname, format=format)
         else:

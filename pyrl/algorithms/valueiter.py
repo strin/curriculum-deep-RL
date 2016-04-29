@@ -366,7 +366,7 @@ class DeepQlearn(object):
         # l2 penalty.
         l2_penalty = 0.
         for param in params:
-            l2_penalty += (param ** 2).sum()
+            l2_penalty += .5 * (param ** 2).sum()
 
         cost = mse + self.l2_reg * l2_penalty
 
@@ -450,7 +450,10 @@ class DeepQlearn(object):
 
             # compute target reward + \gamma max_{a'} Q(ns, a')
             # Ensure target = reward when NEXT_STATE is terminal
-            next_qvals = self.dqn_frozen.fprop(next_states)
+            if self.target_freq > 0:
+                next_qvals = self.dqn_frozen.fprop(next_states)
+            else:
+                next_qvals = self.dqn.fprop(next_states)
             next_vs = np.zeros(self.minibatch_size).astype(floatX)
             for idx in range(self.minibatch_size):
                 if idx not in terminals:
@@ -480,8 +483,13 @@ class DeepQlearn(object):
             #print 'actions', actions
             nn_error = []
             for nn_it in range(self.nn_num_iter):
+                #print 'value before', self.dqn.fprop(states)[range(self.minibatch_size), actions]
                 error = self.bprop(states, actions, targets.flatten(), *reg_vs)
                 #print 'nn_it', nn_it, 'error', error
+                #print 'value after', self.dqn.fprop(states)[range(self.minibatch_size), actions]
+                #print 'targets', targets
+                #print 'rewards', rewards
+                #print 'total_exp', self.total_exp
                 nn_error.append(float(error))
             self.diagnostics['nn-error'].append(nn_error)
 
@@ -536,6 +544,7 @@ class DeepQlearn(object):
                 #    self._end_episode(0, meta)
                 #    break
 
+                #import pdb; pdb.set_trace()
                 action = self.dqn.get_action(curr_state, valid_actions=task.valid_actions, **kwargs)
                 if 'uct' in kwargs: # update uct.
                     kwargs['uct'].visit(curr_state, action)
@@ -555,7 +564,7 @@ class DeepQlearn(object):
                 try:
                     next_state = task.curr_state
                     has_next_state = True
-                except: # sessin has ended.
+                except: # session has ended.
                     next_state = None
                     has_next_state = False
 
@@ -566,7 +575,7 @@ class DeepQlearn(object):
                 if callback:
                     callback(task)
 
-                if self.total_exp % self.target_freq == 0: # update target network.
+                if self.target_freq > 0 and self.total_exp % self.target_freq == 0: # update target network.
                     self.dqn_frozen = self.dqn.copy()
 
                 if task.is_end() or not has_next_state:
