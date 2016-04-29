@@ -13,6 +13,8 @@
 #		with classes or defs but I tried to make it short and understandable with very
 #		little knowledge of python and pygame(I'm one of them). Enjoy.
 import pygame
+import numpy as np
+import numpy.random as npr
 from pygame.locals import *
 from sys import exit
 import random
@@ -50,7 +52,9 @@ bar1_x, bar2_x = 10 , 620.
 bar1_y, bar2_y = 215. , 215.
 circle_x, circle_y = 307.5, 232.5
 bar1_move, bar2_move = 0. , 0.
-speed_x, speed_y, speed_circ, speed_ai = 250., 250., 250., 150
+speed_x, speed_y, speed_circ, speed_ai = 250., 250., 250., 250
+base_speed_y = speed_y
+base_speed_x = speed_x
 ai_speed = 0.
 bar1_score, bar2_score = 0,0
 
@@ -149,18 +153,24 @@ while True:
     if circle_x <= bar1_x + 10.:
         if circle_y >= bar1_y - C / 2. and circle_y <= bar1_y + H1 - C / 2.:
             circle_x = 20.
-            speed_x = -speed_x
+            speed_x = base_speed_x + npr.randn() * 30
+            speed_y = speed_y + abs(npr.randn()) * abs(ai_speed) * (np.sign(bar1_move))
     if circle_x >= bar2_x - 15.:
         if circle_y >= bar2_y - C / 2. and circle_y <= bar2_y + H2 - C / 2.:
             circle_x = 605.
-            speed_x = -speed_x
+            speed_x = -base_speed_x + npr.randn() * 30
+            speed_y = speed_y + abs(npr.randn()) * abs(ai_speed) * (np.sign(ai_speed))
     if circle_x < 5.:
         bar2_score += 1
         circle_x, circle_y = 307.5, 232.5
+        speed_y = base_speed_y * np.sign(npr.randn())
+        speed_x = abs(base_speed_x)
         bar1_y, bar2_y = 215., 215.
     elif circle_x > 620.:
         bar1_score += 1
         circle_x, circle_y = 307.5, 232.5
+        speed_y = base_speed_y * np.sign(npr.randn())
+        speed_x = abs(base_speed_x)
         bar1_y, bar2_y = 215., 215.
     if circle_y <= 10.:
         speed_y = -speed_y
