@@ -300,7 +300,11 @@ class DeepQlearn(object):
     def __init__(self, dqn_mt, gamma=0.95, l2_reg=0.0, lr=1e-3,
                memory_size=250, minibatch_size=64,
                nn_num_batch=1, nn_num_iter=2, regularizer={},
-               target_freq=10, skip_frame=0):
+               target_freq=10, skip_frame=0,
+               exploration_kwargs={
+                   'method': 'eps-greedy',
+                   'epsilon': 0.1
+               }):
         '''
         (TODO): task should be task info.
         we don't use all of task properties/methods here.
@@ -317,6 +321,7 @@ class DeepQlearn(object):
         self.gamma = floatX(gamma)
         self.regularizer = regularizer
         self.skip_frame = skip_frame
+        self.exploration_kwargs = exploration_kwargs
 
         # for now, keep experience as a list of tuples
         self.experience = []
@@ -325,6 +330,7 @@ class DeepQlearn(object):
 
         # used for streaming updates
         self.last_state = None
+        self.last_valid_actions = None
         self.last_action = None
 
         # params for nn optimization.
@@ -431,7 +437,7 @@ class DeepQlearn(object):
             terminals = []
             for idx, sample in enumerate(samples):
                 state, action, next_state, reward, meta = sample
-                nva = meta['curr_valid_actions']
+                nva = meta['next_valid_actions']
 
                 states[idx] = state
                 actions[idx] = action
@@ -512,86 +518,31 @@ class DeepQlearn(object):
         self.last_action = None
 
 
-    def run(self, task, num_episodes=100, tol=1e-4, budget=None, callback=None, **kwargs):
-        '''
-        task: the task to run on.
-            num_episodes: how many episodes to repeat at maximum.
-            tol: tolerance in terms of reward signal.
-            budget: how many total steps to take.
+    def get_action(self, curr_state, valid_actions):
+        action = self.dqn.get_action(curr_state, valid_actions=valid_actions,
+                                     **self.exploration_kwargs)
 
-        note on stability:
-            first makes a snapshot of dqn, and use that to evaluate targets.
-        '''
-        cum_rewards = []
-        total_steps = 0.
-        for ei in range(num_episodes):
-            task.reset()
+        self.last_valid_actions = valid_actions
+        self.last_state = curr_state
+        self.last_action = action
+        return action
 
-            curr_state = task.curr_state
 
-            num_steps = 0.
-            cum_reward = 0.
-            factor = 1.
-            while True:
-                # TODO: Hack!
-                meta = {}
-                meta['last_valid_actions'] = task.valid_actions
-                meta['num_actions'] = task.num_actions
+    def send_feedback(self, reward, next_state, next_valid_actions, is_end):
+        self.next_valid_actions = next_valid_actions
 
-                # print 'Lying and tell the agent the episode is over!'
-                #if self.gamma < 1. and num_steps >= np.log(tol) / np.log(self.gamma):
-                #    meta['curr_valid_actions'] = []
-                #    self._end_episode(0, meta)
-                #    break
+        if self.target_freq > 0 and self.total_exp % self.target_freq == 0: # update target network.
+            self.dqn_frozen = self.dqn.copy()
 
-                #import pdb; pdb.set_trace()
-                action = self.dqn.get_action(curr_state, valid_actions=task.valid_actions, **kwargs)
-                if 'uct' in kwargs: # update uct.
-                    kwargs['uct'].visit(curr_state, action)
+        meta = {
+            'next_valid_actions': next_valid_actions
+        }
 
-                self.last_state = curr_state
-                self.last_action = action
+        if next_state is None or is_end:
+            self._end_episode(reward, meta)
+        else:
+            self._learn(next_state, reward, meta)
 
-                reward = task.step(action)
-                print 'curr_state', self.last_state
-                print 'is_end', task.is_end()
-                cum_reward += factor * reward
-                factor *= self.gamma
-
-                #print 'action', action
-                #print 'reward', reward, 'cum', cum_reward
-
-                meta['curr_valid_actions'] = task.valid_actions
-
-                try:
-                    next_state = task.curr_state
-                    has_next_state = True
-                except: # session has ended.
-                    next_state = None
-                    has_next_state = False
-
-                num_steps += 1
-                total_steps += 1
-
-                # call diagnostics callback if provided.
-                if callback:
-                    callback(task)
-
-                if self.target_freq > 0 and self.total_exp % self.target_freq == 0: # update target network.
-                    self.dqn_frozen = self.dqn.copy()
-
-                if task.is_end() or not has_next_state:
-                    self._end_episode(reward, meta)
-                    break
-                else:
-                    self._learn(next_state, reward, meta)
-                    curr_state = next_state
-
-                if budget and num_steps >= budget:
-                    break
-            cum_rewards.append(cum_reward)
-        task.reset()
-        return np.mean(cum_rewards)
 
 def compute_tabular_value(task, tol=1e-4):
     solver = ValueIterationSolver(task, tol=tol)
