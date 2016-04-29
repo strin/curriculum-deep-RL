@@ -138,9 +138,9 @@ while True:
 #AI of the computer.
     if circle_x >= 320 - C / 2.:
         if not bar2_y == circle_y + C / 2.:
-            if bar2_y < circle_y + C / 2.:
+            if bar2_y + H2 / 2.< circle_y :
                 bar2_y += ai_speed
-            if  bar2_y > circle_y - H2 + C / 2.:
+            if  bar2_y - H2/ 2.> circle_y - H2 + C / 2.:
                 bar2_y -= ai_speed
         else:
             bar2_y == circle_y + C / 2.
@@ -154,12 +154,12 @@ while True:
         if circle_y >= bar1_y - C / 2. and circle_y <= bar1_y + H1 - C / 2.:
             circle_x = 20.
             speed_x = base_speed_x + npr.randn() * 30
-            speed_y = speed_y + abs(npr.randn()) * abs(ai_speed) * (np.sign(bar1_move))
+            speed_y = speed_y + abs(npr.randn()) * 30 * (np.sign(bar1_move))
     if circle_x >= bar2_x - 15.:
         if circle_y >= bar2_y - C / 2. and circle_y <= bar2_y + H2 - C / 2.:
             circle_x = 605.
             speed_x = -base_speed_x + npr.randn() * 30
-            speed_y = speed_y + abs(npr.randn()) * abs(ai_speed) * (np.sign(ai_speed))
+            speed_y = speed_y + abs(npr.randn()) * 30 * (np.sign(ai_speed))
     if circle_x < 5.:
         bar2_score += 1
         circle_x, circle_y = 307.5, 232.5
