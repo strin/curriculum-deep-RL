@@ -53,11 +53,10 @@ def function_intercept(intercepted_func, intercepting_func, pass_on=False):
 
 
 class PygameSimulator(object):
-    def __init__(self, learner, game_module_name, valid_events):
+    def __init__(self, game_module_name, valid_events):
         self.game_module_name = game_module_name
         self.game_module = None
         self.game_code = None
-        self.learner = learner
         self.valid_actions = range(len(valid_events))
         self.valid_events = valid_events
         self._keys_pressed = []
@@ -65,6 +64,7 @@ class PygameSimulator(object):
         self.cum_reward = 0
         self.curr_score = 0
         self.num_steps = 0
+        self.learner = None
 
 
 
@@ -80,14 +80,15 @@ class PygameSimulator(object):
         is_end = self.is_end()
         reward = score - self.curr_score
         self.curr_score = score
-        curr_state = pygame.surfarray.array3d(pygame.display.get_surface())
-        if self.num_steps > 0:
-            self.learner.send_feedback(reward, curr_state, self.valid_actions, is_end)
-        if is_end:
-            return
-        action = self.learner.get_action(curr_state, self.valid_actions)
-        self._last_keys_pressed = self._keys_pressed
-        self._keys_pressed = [self.valid_events[action]]
+        if self.learner:
+            curr_state = pygame.surfarray.array3d(pygame.display.get_surface())
+            if self.num_steps > 0:
+                self.learner.send_feedback(reward, curr_state, self.valid_actions, is_end)
+            if is_end:
+                return
+            action = self.learner.get_action(curr_state, self.valid_actions)
+            self._last_keys_pressed = self._keys_pressed
+            self._keys_pressed = [self.valid_events[action]]
         self.num_steps += 1
 
 
@@ -132,7 +133,8 @@ class PygameSimulator(object):
         pass
 
 
-    def run(self):
+    def run(self, learner):
+        self.learner = learner
         pygame.display.flip = function_intercept(pygame.display.flip, self._on_screen_update)
         pygame.display.update = function_intercept(pygame.display.update, self._on_screen_update)
         pygame.event.get = function_intercept(pygame.event.get, self._on_event_get)
