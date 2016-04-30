@@ -95,12 +95,18 @@ class Conv2D(object):
 
     def __call__(self, inputs):
         # set-up the outputs
-        #conv_out = self.act(T.nnet.conv.conv2d(inputs, self.W, subsample=self.stride,
-        #                                       border_mode=self.border_mode)
-        #                    + self.b.dimshuffle('x', 0, 'x', 'x'))
-        conv_out = self.act(dnn_conv(inputs, self.W, subsample=self.stride,
-                                               border_mode=self.border_mode)
-                            + self.b.dimshuffle('x', 0, 'x', 'x'))
+        try:
+            conv_out = self.act(dnn_conv(inputs, self.W, subsample=self.stride,
+                                                   border_mode=self.border_mode)
+                                + self.b.dimshuffle('x', 0, 'x', 'x'))
+        except Exception:
+            print '[warning] not using cuDNN'
+            import traceback
+            traceback.print_exc()
+            conv_out = self.act(T.nnet.conv.conv2d(inputs, self.W, subsample=self.stride,
+                                                   border_mode=self.border_mode)
+                                + self.b.dimshuffle('x', 0, 'x', 'x'))
+
         return conv_out
 
     def get_params(self):

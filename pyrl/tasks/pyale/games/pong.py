@@ -16,13 +16,12 @@ import pygame
 import numpy as np
 import numpy.random as npr
 from pygame.locals import *
-from sys import exit
+import sys
 import random
 
 pygame.init()
 pygame.font.init()
 pygame.display.set_caption("Pong Pong!")
-
 
 screen=pygame.display.set_mode((640,480),0,32)
 
@@ -63,11 +62,14 @@ clock = pygame.time.Clock()
 # font = pygame.font.SysFont("calibri",40)
 
 get_event = lambda: pygame.event.get()
+is_end = False
 
-while True:
+
+while not is_end:
     for event in get_event():
         if event.type == QUIT:
-            exit()
+            is_end = True # TODO: figure out how to intercept exit.
+            break
         if event.type == KEYDOWN:
             if event.key == K_UP:
                 bar1_move = -ai_speed

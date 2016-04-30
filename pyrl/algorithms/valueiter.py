@@ -301,6 +301,7 @@ class DeepQlearn(object):
                memory_size=250, minibatch_size=64,
                nn_num_batch=1, nn_num_iter=2, regularizer={},
                target_freq=10, skip_frame=0,
+               frames_per_action=4,
                exploration_kwargs={
                    'method': 'eps-greedy',
                    'epsilon': 0.1
@@ -322,6 +323,7 @@ class DeepQlearn(object):
         self.regularizer = regularizer
         self.skip_frame = skip_frame
         self.exploration_kwargs = exploration_kwargs
+        self.frames_per_action = frames_per_action
 
         # for now, keep experience as a list of tuples
         self.experience = []
@@ -489,13 +491,13 @@ class DeepQlearn(object):
             #print 'actions', actions
             nn_error = []
             for nn_it in range(self.nn_num_iter):
-                #print 'value before', self.dqn.fprop(states)[range(self.minibatch_size), actions]
+                print 'value before\n', self.dqn.fprop(states)[range(self.minibatch_size), actions]
                 error = self.bprop(states, actions, targets.flatten(), *reg_vs)
-                #print 'nn_it', nn_it, 'error', error
-                #print 'value after', self.dqn.fprop(states)[range(self.minibatch_size), actions]
-                #print 'targets', targets
-                #print 'rewards', rewards
-                #print 'total_exp', self.total_exp
+                print 'nn_it', nn_it, 'error', error
+                print 'value after\n', self.dqn.fprop(states)[range(self.minibatch_size), actions]
+                print 'targets\n', targets
+                print 'rewards', rewards
+                print 'total_exp', self.total_exp
                 nn_error.append(float(error))
             self.diagnostics['nn-error'].append(nn_error)
 
@@ -521,7 +523,6 @@ class DeepQlearn(object):
     def get_action(self, curr_state, valid_actions):
         action = self.dqn.get_action(curr_state, valid_actions=valid_actions,
                                      **self.exploration_kwargs)
-
         self.last_valid_actions = valid_actions
         self.last_state = curr_state
         self.last_action = action

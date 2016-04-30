@@ -105,9 +105,7 @@ class RawVideoRecorder(object):
             '-vcodec', 'mpeg4',
             fname ]
 
-        movie = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=self.output, stderr=self.output)
-
-        self.movie = movie
+        self.movie = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=self.output, stderr=self.output)
         self.finished = False
 
 
@@ -120,6 +118,12 @@ class RawVideoRecorder(object):
     def stop(self):
         self.movie.communicate()
         self.finished = True
+        # clean up subprocess.
+        try:
+            self.movie.kill()
+        except OSError:
+            # can't kill a dead proc
+            pass
 
 
 def html_embed_mp4(video_path, style=''):

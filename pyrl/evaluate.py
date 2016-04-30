@@ -3,6 +3,7 @@ import numpy.random as npr
 from pyrl.tasks.task import Task, task_breakpoint
 from pyrl.algorithms.valueiter import compute_tabular_value
 
+
 def estimate_temperature(policy, states, valid_actions, entropy = 0.3, tol=1e-1):
     '''
     given a set of states, binary search temperature so that the average entropy of policy
@@ -50,6 +51,41 @@ def estimate_temperature(policy, states, valid_actions, entropy = 0.3, tol=1e-1)
             print prob
             return temperature
         iteration += 1
+
+
+class DumbLearner(object):
+    '''
+    a learner that never learns.
+    '''
+    def __init__(self, dqn, entropy=0.2):
+        self.dqn = dqn
+        self.entropy = entropy
+        self.cum_reward = 0.
+
+
+    def get_action(self, curr_state, valid_actions):
+        temperature = estimate_temperature(self.dqn, [curr_state], [valid_actions], entropy=self.entropy, tol=1e-2)
+        action = self.dqn.get_action(curr_state, valid_actions=valid_actions, method='softmax', temperature=temperature)
+        return action
+
+
+    def send_feedback(self, reward, next_state, next_valid_actions, is_end):
+        self.cum_reward += reward
+        pass # ignore, 'caz i am dumb learner.
+
+
+def reward_simulator_samples(dqn, simulator, num_trials=10, entropy=0.2, num_frames=10000, callback=None):
+    total_reward = []
+    for ni in range(num_trials):
+        learner = DumbLearner(dqn, entropy=entropy)
+        simulator.run(learner, callback=callback)
+        total_reward.append(simulator.cum_reward)
+    return total_reward
+
+
+def reward_simulator_mean_std(dqn, simulator, **kwargs):
+    samples = reward_simulator_samples(dqn, simulator, **kwargs)
+    return (np.mean(samples), np.std(samples))
 
 
 def reward_search_samples(search_func, task, num_trials=10, gamma=0.95, tol=1e-2, entropy=0.1, callback=None):

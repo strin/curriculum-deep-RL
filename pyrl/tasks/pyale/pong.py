@@ -4,8 +4,9 @@ from pygame.locals import *
 WINNING_SCORE = 1
 
 class PongSimulator(PygameSimulator):
-    def __init__(self, learner):
-        PygameSimulator.__init__(self, learner, 'pong', [K_DOWN, K_UP])
+    def __init__(self, state_type='pixel'):
+        PygameSimulator.__init__(self, 'pong', [K_DOWN, K_UP], 
+                state_type=state_type)
 
 
     def is_end(self):

@@ -24,6 +24,11 @@ class TaskSimulator(object):
             #    meta['curr_valid_actions'] = []
             #    self._end_episode(0, meta)
             #    break
+            if callback:
+                callback()
+
+            if task.is_end():
+                break
 
             action = learner.get_action(curr_state, task.valid_actions)
             reward = task.step(action)
@@ -35,12 +40,6 @@ class TaskSimulator(object):
                 next_state = None
                 next_valid_actions = None
             learner.send_feedback(reward, next_state, next_valid_actions, task.is_end())
-
-            if callback:
-                callback(task)
-
-            if task.is_end():
-                break
 
             curr_state = next_state
         task.reset()
