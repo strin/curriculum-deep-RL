@@ -62,44 +62,10 @@ bar1_score, bar2_score = 0,0
 clock = pygame.time.Clock()
 # font = pygame.font.SysFont("calibri",40)
 
-try:
-    # hook for ALE.
-    import sys, os
-    sys.path.append(os.environ["PYRL"])
-    from pyrl.tasks.pyale import SyncEvent
-    _event = SyncEvent()
-    get_event = lambda: _event.get()
-    _event.mount('valid_events', lambda: [(KEYDOWN, K_UP), (KEYDOWN, K_DOWN),
-                                          (KEYUP, K_UP), (KEYUP, K_DOWN)]
-                )
-    _event.mount('score', lambda: bar1_score - bar2_score)
-    _event.mount('is_end', lambda: bar1_score >= 1 or bar2_score >= 1)
-    _event.mount('screen', lambda: {
-        'width': width,
-        'height': height,
-        'data': pygame.image.tostring(screen, 'RGB')
-    })
-    _event.mount('state', lambda: {
-        'y1a': bar1_y,
-        'y1b': bar1_y + H1 / 2.,
-        'y2a': bar2_y,
-        'y2b': bar2_y + H2 / 2.,
-        'cx': circle_x,
-        'cy': circle_y
-    })
-
-
-except Exception as e:
-    #import traceback
-    #with open('tmp.txt', 'w') as f:
-    #    import os
-    #    print>>f, '[warning] use pygame events:', e.message, sys.path
-    #    traceback.print_exc(file=f)
-    get_event = lambda: pygame.event.get()
+get_event = lambda: pygame.event.get()
 
 while True:
     for event in get_event():
-        #print>>f, event.type, event.key
         if event.type == QUIT:
             exit()
         if event.type == KEYDOWN:
