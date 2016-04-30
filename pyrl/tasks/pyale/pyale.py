@@ -211,11 +211,6 @@ class PygameSimulator(object):
         return self.cum_reward
 
 
-
-
-
-
-
 def encode_obj(obj):
     '''
     encode object in one-line string.
