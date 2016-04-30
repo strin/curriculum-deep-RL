@@ -46,34 +46,3 @@ class TaskSimulator(object):
             curr_state = next_state
         task.reset()
         return cum_reward
-
-import pygame
-import pygame.key
-import pygame.surfarray
-
-
-class PygameSimulator(object):
-    def __init__(self, game_module):
-        self.game_module = game_module
-
-
-    def _on_screen_update(self, _, *args, **kwargs):
-        print 'screen update!'
-        pass
-
-
-    def _on_event_get(self, _, *args, **kwargs):
-        print 'on event get'
-        pass
-
-
-    def _on_time_clock(self, real_clock, *args, **kwargs):
-        pass
-
-    def run(self):
-        reload(self.game_module)
-        pygame.display.flip = function_intercept(pygame.display.flip, self._on_screen_update)
-        pygame.display.update = function_intercept(pygame.display.update, self._on_screen_update)
-        pygame.event.get = function_intercept(pygame.event.get, self._on_event_get)
-        pygame.time.Clock = function_intercept(pygame.time.Clock, self._on_time_clock)
-        #pygame.time.get_ticks = function_intercept(pygame.time.get_ticks, self.get_game_time_ms)

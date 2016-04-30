@@ -12,13 +12,150 @@ import dill
 import base64
 import select
 
-import pygame
 import pygame.image
 from pygame.event import Event
-from pygame.locals import *
 
 from scipy.misc import imread
 from StringIO import StringIO
+
+
+import pygame
+from pygame.locals import *
+import pygame.key
+import pygame.surfarray
+import imp
+import os
+import inspect
+
+def function_intercept(intercepted_func, intercepting_func, pass_on=False):
+    """
+    Intercepts a method call and calls the supplied intercepting_func with the result of it's call and it's arguments
+    Example:
+        def get_event(result_of_real_event_get, *args, **kwargs):
+            # do work
+            return result_of_real_event_get
+        pygame.event.get = function_intercept(pygame.event.get, get_event)
+    :param intercepted_func: The function we are going to intercept
+    :param intercepting_func:   The function that will get called after the intercepted func. It is supplied the return
+    value of the intercepted_func as the first argument and it's args and kwargs.
+    :return: a function that combines the intercepting and intercepted function, should normally be set to the
+             intercepted_functions location
+    """
+
+    def wrap(*args, **kwargs):
+        real_results = intercepted_func(*args, **kwargs)  # call the function we are intercepting and get it's result
+        intercepted_results = intercepting_func(real_results, *args, **kwargs)  # call our own function a
+        if pass_on:
+            return real_results + intercepted_results
+        return intercepted_results
+
+    return wrap
+
+
+class PygameSimulator(object):
+    def __init__(self, learner, game_module_name, valid_events):
+        self.game_module_name = game_module_name
+        self.game_module = None
+        self.game_code = None
+        self.learner = learner
+        self.valid_actions = range(len(valid_events))
+        self.valid_events = valid_events
+        self._keys_pressed = []
+        self._last_keys_pressed = []
+        self.cum_reward = 0
+        self.curr_score = 0
+        self.num_steps = 0
+
+
+
+    def _get_attr(self, name):
+        game_frame = [frame for frame in inspect.stack()
+                      if frame[1].find('pyrl/tasks/pyale/games') != -1][0][0]
+        game_module = inspect.getmodule(game_frame)
+        return getattr(game_module, name)
+
+
+    def _on_screen_update(self, _, *args, **kwargs):
+        score = self.get_score()
+        is_end = self.is_end()
+        reward = score - self.curr_score
+        self.curr_score = score
+        curr_state = pygame.surfarray.array3d(pygame.display.get_surface())
+        if self.num_steps > 0:
+            self.learner.send_feedback(reward, curr_state, self.valid_actions, is_end)
+        if is_end:
+            return
+        action = self.learner.get_action(curr_state, self.valid_actions)
+        self._last_keys_pressed = self._keys_pressed
+        self._keys_pressed = [self.valid_events[action]]
+        self.num_steps += 1
+
+
+    def _on_event_get(self, _, *args, **kwargs):
+        if self.is_end():
+            return [pygame.event.Event(QUIT, {})]
+
+        key_down_events = [pygame.event.Event(KEYDOWN, {"key": x})
+                           for x in self._keys_pressed if x not in self._last_keys_pressed]
+        key_up_events = [pygame.event.Event(KEYUP, {"key": x})
+                         for x in self._last_keys_pressed if x not in self._keys_pressed]
+
+        result = []
+        if args:
+            if hasattr(args[0], "__iter__"):
+                args = args[0]
+
+            for type_filter in args:
+                if type_filter == QUIT:
+                    if type_filter == QUIT:
+                        if self.pass_quit_event:
+                            for e in _:
+                                if e.type == QUIT:
+                                    result.append(e)
+                    else:
+                        pass  # never quit
+                elif type_filter == KEYUP:
+                    result = result + key_up_events
+                elif type_filter == KEYDOWN:
+                    result = result + key_down_events
+        else:
+            result = key_down_events + key_up_events
+            for e in _:
+                if e.type == QUIT:
+                    result.append(e)
+
+        return result
+
+
+    def _on_time_clock(self, real_clock, *args, **kwargs):
+        print 'time_clock'
+        pass
+
+
+    def run(self):
+        pygame.display.flip = function_intercept(pygame.display.flip, self._on_screen_update)
+        pygame.display.update = function_intercept(pygame.display.update, self._on_screen_update)
+        pygame.event.get = function_intercept(pygame.event.get, self._on_event_get)
+        pygame.time.Clock = function_intercept(pygame.time.Clock, self._on_time_clock)
+        #pygame.time.get_ticks = function_intercept(pygame.time.get_ticks, self.get_game_time_ms)
+        # run game using dynamic importing.
+        ## crude way of writing load.
+        #self.game_module = imp.new_module(self.game_module_name)
+
+        #if not self.game_code:
+        #    game_path = os.path.join(os.path.dirname(__file__),
+        #                            self.game_module_name + '.py')
+        #    with open(game_path, 'r') as f:
+        #        self.game_code = compile(f.read(), game_path, 'exec')
+        #        print 'game code', self.game_code
+
+        #exec(self.game_code, self.game_module.__dict__)
+
+        exec('from pyrl.tasks.pyale.games.%s import *' % self.game_module_name)
+
+
+
+
 
 
 def encode_obj(obj):
