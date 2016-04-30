@@ -60,7 +60,7 @@ class VideoRecorder(object):
             '-y', # (optional) overwrite output file if it exists
             '-f', 'image2pipe',
             '-vcodec', 'mjpeg',
-            '-r', '30', # frames per second
+            '-r', '48', # frames per second
             '-i', '-', # The input comes from a pipe
             '-vcodec', 'libx264',
             '-an', # Tells FFMPEG not to expect any audio
@@ -99,7 +99,7 @@ class RawVideoRecorder(object):
             '-vcodec','rawvideo',
             '-s', '%sx%s' % (screen_size[0], screen_size[1]), # size of one frame
             '-pix_fmt', 'rgb24',
-            '-r', '24', # frames per second
+            '-r', '48', # frames per second
             '-i', '-', # The input comes from a pipe
             '-an', # Tells FFMPEG not to expect any audio
             '-vcodec', 'mpeg4',
