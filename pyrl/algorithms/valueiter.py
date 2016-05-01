@@ -456,6 +456,7 @@ class DeepQlearn(object):
             states = np.array(states).astype(floatX)
             next_states = np.array(next_states).astype(floatX)
 
+            import pdb; pdb.set_trace();
             # compute target reward + \gamma max_{a'} Q(ns, a')
             # Ensure target = reward when NEXT_STATE is terminal
             if self.target_freq > 0:
@@ -491,13 +492,16 @@ class DeepQlearn(object):
             #print 'actions', actions
             nn_error = []
             for nn_it in range(self.nn_num_iter):
-                print 'value before\n', self.dqn.fprop(states)[range(self.minibatch_size), actions]
+                if self.total_exp % self.target_freq == 0:
+                    print 'value before\n', self.dqn.fprop(states)[range(self.minibatch_size), actions]
                 error = self.bprop(states, actions, targets.flatten(), *reg_vs)
-                print 'nn_it', nn_it, 'error', error
-                print 'value after\n', self.dqn.fprop(states)[range(self.minibatch_size), actions]
-                print 'targets\n', targets
-                print 'rewards', rewards
-                print 'total_exp', self.total_exp
+                if self.total_exp % self.target_freq == 0:
+                    print 'nn_it', nn_it, 'error', error
+                    print 'value after\n', self.dqn.fprop(states)[range(self.minibatch_size), actions]
+                    print 'targets\n', targets
+                    print 'next_qvals\n', next_qvals
+                    print 'rewards', rewards
+                    print 'total_exp', self.total_exp
                 nn_error.append(float(error))
             self.diagnostics['nn-error'].append(nn_error)
 
@@ -533,6 +537,7 @@ class DeepQlearn(object):
         self.next_valid_actions = next_valid_actions
 
         if self.target_freq > 0 and self.total_exp % self.target_freq == 0: # update target network.
+            print 'updating target network'
             self.dqn_frozen = self.dqn.copy()
 
         meta = {

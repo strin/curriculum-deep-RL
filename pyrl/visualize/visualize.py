@@ -105,7 +105,7 @@ class RawVideoRecorder(object):
             '-vcodec', 'mpeg4',
             fname ]
 
-        self.movie = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=self.output, stderr=self.output)
+        self.movie = subprocess.Popen(command, close_fds=True, stdin=subprocess.PIPE, stdout=self.output, stderr=self.output)
         self.finished = False
 
 

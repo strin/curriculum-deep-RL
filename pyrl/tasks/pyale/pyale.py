@@ -114,7 +114,7 @@ class PygameSimulator(object):
             if self.callback:
                 self.callback()
 
-            if self.last_action:
+            if self.last_action != None:
                 self.learner.send_feedback(reward, curr_state, self.valid_actions, is_end)
             if is_end:
                 return
