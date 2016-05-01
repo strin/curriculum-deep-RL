@@ -16,7 +16,7 @@ import pygame
 import numpy as np
 import numpy.random as npr
 from pygame.locals import *
-import sys
+import sys, os
 import random
 
 pygame.init()
@@ -26,8 +26,14 @@ pygame.display.set_caption("Pong Pong!")
 screen=pygame.display.set_mode((640,480),0,32)
 
 W = 20
-H1 = 50
-H2 = 50
+try:
+    H1 = int(os.environ['H1'])
+except:
+    H1 = 50
+try:
+    H2 = int(os.environ['H2'])
+except:
+    H2 = 50
 C = 15
 show_score = False
 
@@ -112,13 +118,16 @@ while not is_end:
     ai_speed = speed_ai * time_sec
 #AI of the computer.
     if circle_x >= 320 - C / 2.:
-        if not bar2_y == circle_y + C / 2.:
-            if bar2_y + H2 / 2.< circle_y :
-                bar2_y += ai_speed
-            if  bar2_y - H2/ 2.> circle_y - H2 + C / 2.:
-                bar2_y -= ai_speed
+        if npr.rand() < 0.2: # random action.
+            bar2_y += np.sign(npr.randn()) * ai_speed
         else:
-            bar2_y == circle_y + C / 2.
+            if not bar2_y == circle_y + C / 2.:
+                if bar2_y + H2 / 2.< circle_y :
+                    bar2_y += ai_speed
+                if  bar2_y - H2/ 2.> circle_y - H2 + C / 2.:
+                    bar2_y -= ai_speed
+            else:
+                bar2_y == circle_y + C / 2.
 
     if bar1_y >= 480. - H1: bar1_y = 480. - H1
     elif bar1_y <= 10. : bar1_y = 10.

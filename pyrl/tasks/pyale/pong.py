@@ -19,6 +19,6 @@ class PongSimulator(PygameSimulator):
 
     def get_score(self):
         bar1_score = self._get_attr('bar1_score')
-        bar2_score = self._get_attr('bar2_score')
-        return bar1_score - bar2_score
+        #bar2_score = self._get_attr('bar2_score')
+        return bar1_score
 
