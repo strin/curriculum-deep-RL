@@ -74,7 +74,7 @@ if show_score:
 
 get_event = lambda: pygame.event.get()
 is_end = False
-
+opening = 1
 
 while not is_end:
     for event in get_event():
@@ -118,13 +118,14 @@ while not is_end:
     ai_speed = speed_ai * time_sec
 #AI of the computer.
     if circle_x >= 320 - C / 2.:
-        if npr.rand() < 0.2: # random action.
+        if npr.rand() < 0.: # random action.
             bar2_y += np.sign(npr.randn()) * ai_speed
         else:
+            noise = npr.randn() * 20 * (1 - opening)
             if not bar2_y == circle_y + C / 2.:
-                if bar2_y + H2 / 2.< circle_y :
+                if bar2_y + H2 / 2. + noise < circle_y :
                     bar2_y += ai_speed
-                if  bar2_y - H2/ 2.> circle_y - H2 + C / 2.:
+                if  bar2_y + H2/ 2.  + noise > circle_y  + C / 2.:
                     bar2_y -= ai_speed
             else:
                 bar2_y == circle_y + C / 2.
@@ -139,23 +140,27 @@ while not is_end:
             circle_x = bar1_x + W
             speed_x = base_speed_x + npr.randn() * 30
             speed_y = speed_y + abs(npr.randn()) * 30 * (np.sign(bar1_move))
+            opening = 0
     if circle_x >= bar2_x - C:
         if circle_y >= bar2_y - C / 2. and circle_y <= bar2_y + H2 - C / 2.:
             circle_x = bar2_x - C
             speed_x = -base_speed_x + npr.randn() * 30
             speed_y = speed_y + abs(npr.randn()) * 30 * (np.sign(ai_speed))
+            opening = 0
     if circle_x < 5.:
         bar2_score += 1
         circle_x, circle_y = 307.5, 232.5
         speed_y = base_speed_y * np.sign(npr.randn())
         speed_x = abs(base_speed_x)
         bar1_y, bar2_y = 215., 215.
+        opening = 1
     elif circle_x > 620.:
         bar1_score += 1
         circle_x, circle_y = 307.5, 232.5
         speed_y = base_speed_y * np.sign(npr.randn())
         speed_x = abs(base_speed_x)
         bar1_y, bar2_y = 215., 215.
+        opening = 1
     if circle_y <= 10.:
         speed_y = -speed_y
         circle_y = 10.
