@@ -25,29 +25,32 @@ pygame.display.set_caption("Pong Pong!")
 
 screen=pygame.display.set_mode((640,480),0,32)
 
-W = 40
+W = 20
 H1 = 50
 H2 = 50
 C = 15
+show_score = True
 
 #Creating 2 bars, a ball and background.
 height = 480
 width = 640
 back = pygame.Surface((width,height))
 background = back.convert()
-background.fill((0,0,0))
-bar1 = pygame.Surface((10,H1)).convert()
-bar1.fill((0,0,255))
-bar2 = pygame.Surface((10,H2)).convert()
-bar2.fill((255,0,0))
+background.fill((144,72,17))
+bar1 = pygame.Surface((W,H1)).convert()
+bar1.fill((101, 213, 77))
+bar2 = pygame.Surface((W,H2)).convert()
+bar2.fill((213, 130, 74))
 circ_sur = pygame.Surface((C,C))
-circ = pygame.draw.circle(circ_sur,(0,255,0),(C/2,C/2),C/2)
+# circ = pygame.draw.circle(circ_sur,(0,255,0),(C/2,C/2),C/2) # circle shape
+circ = circ_sur # rect shape
+circ.fill((255, 255, 255)) 
 circle = circ_sur.convert()
 circle.set_colorkey((0,0,0))
 
 
 # some definitions
-bar1_x, bar2_x = 10 , 620.
+bar1_x, bar2_x = 2 * W , 640 - 3 * W
 bar1_y, bar2_y = 215. , 215.
 circle_x, circle_y = 307.5, 232.5
 bar1_move, bar2_move = 0. , 0.
@@ -59,7 +62,9 @@ bar1_score, bar2_score = 0,0
 
 #clock and font objects
 clock = pygame.time.Clock()
-# font = pygame.font.SysFont("calibri",40)
+
+if show_score:
+    font = pygame.font.SysFont("Eurostile", 70)
 
 get_event = lambda: pygame.event.get()
 is_end = False
@@ -81,17 +86,19 @@ while not is_end:
             elif event.key == K_DOWN:
                 bar1_move = 0.
 
-    #score1 = font.render(str(bar1_score), True,(255,255,255))
-    #score2 = font.render(str(bar2_score), True,(255,255,255))
 
     screen.blit(background,(0,0))
-    frame = pygame.draw.rect(screen,(255,255,255),Rect((5,5),(630,470)),2)
-    middle_line = pygame.draw.aaline(screen,(255,255,255),(330,5),(330,475))
+    #frame = pygame.draw.rect(screen,(255,255,255),Rect((5,5),(630,470)),2)
+    #middle_line = pygame.draw.aaline(screen,(255,255,255),(330,5),(330,475))
     screen.blit(bar1,(bar1_x,bar1_y))
     screen.blit(bar2,(bar2_x,bar2_y))
     screen.blit(circle,(circle_x,circle_y))
-    #screen.blit(score1,(250.,210.))
-    #screen.blit(score2,(380.,210.))
+
+    if show_score:
+        score1 = font.render(str(bar1_score), True, (101, 213, 77))
+        score2 = font.render(str(bar2_score), True, (213, 130, 74))
+        screen.blit(score1,(200.,50.))
+        screen.blit(score2,(430.,50.))
 
     bar1_y += bar1_move
 
@@ -118,14 +125,14 @@ while not is_end:
     if bar2_y >= 480. - H2: bar2_y = 480 - H2
     elif bar2_y <= 10.: bar2_y = 10.
 #since i don't know anything about collision, ball hitting bars goes like this.
-    if circle_x <= bar1_x + 10.:
+    if circle_x <= bar1_x + W:
         if circle_y >= bar1_y - C / 2. and circle_y <= bar1_y + H1 - C / 2.:
-            circle_x = 20.
+            circle_x = bar1_x + W
             speed_x = base_speed_x + npr.randn() * 30
             speed_y = speed_y + abs(npr.randn()) * 30 * (np.sign(bar1_move))
-    if circle_x >= bar2_x - 15.:
+    if circle_x >= bar2_x - C:
         if circle_y >= bar2_y - C / 2. and circle_y <= bar2_y + H2 - C / 2.:
-            circle_x = 605.
+            circle_x = bar2_x - C
             speed_x = -base_speed_x + npr.randn() * 30
             speed_y = speed_y + abs(npr.randn()) * 30 * (np.sign(ai_speed))
     if circle_x < 5.:

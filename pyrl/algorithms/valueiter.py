@@ -456,7 +456,6 @@ class DeepQlearn(object):
             states = np.array(states).astype(floatX)
             next_states = np.array(next_states).astype(floatX)
 
-            import pdb; pdb.set_trace();
             # compute target reward + \gamma max_{a'} Q(ns, a')
             # Ensure target = reward when NEXT_STATE is terminal
             if self.target_freq > 0:
