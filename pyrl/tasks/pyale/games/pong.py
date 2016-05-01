@@ -29,7 +29,7 @@ W = 20
 H1 = 50
 H2 = 50
 C = 15
-show_score = True
+show_score = False
 
 #Creating 2 bars, a ball and background.
 height = 480

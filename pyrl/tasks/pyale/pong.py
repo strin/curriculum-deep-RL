@@ -5,7 +5,7 @@ WINNING_SCORE = 1
 
 class PongSimulator(PygameSimulator):
     def __init__(self, state_type='pixel'):
-        PygameSimulator.__init__(self, 'pong', [K_DOWN, K_UP], 
+        PygameSimulator.__init__(self, 'pong', [K_DOWN, K_UP],
                 state_type=state_type)
 
 

@@ -52,7 +52,7 @@ def function_intercept(intercepted_func, intercepting_func, pass_on=False):
     return wrap
 
 class PygameSimulator(object):
-    def __init__(self, game_module_name, valid_events, state_type='pixel', frames_per_action=4):
+    def __init__(self, game_module_name, valid_events, state_type='pixel', frames_per_action=2):
         self.game_module_name = game_module_name
         self.game_module = None # cached game module
         self.game_code = None
