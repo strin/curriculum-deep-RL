@@ -462,10 +462,19 @@ class DeepQlearn(object):
                 next_qvals = self.dqn_frozen.fprop(next_states)
             else:
                 next_qvals = self.dqn.fprop(next_states)
+
+            use_DDQN = False
             next_vs = np.zeros(self.minibatch_size).astype(floatX)
-            for idx in range(self.minibatch_size):
-                if idx not in terminals:
-                    next_vs[idx] = np.max(next_qvals[idx, nvas[idx]])
+            if use_DDQN: # double DQN.
+                next_qvals_unfrozen = self.dqn.fprop(next_states)
+                for idx in range(self.minibatch_size):
+                    if idx not in terminals:
+                        next_action_index = np.argmax(next_qvals_unfrozen[idx, nvas[idx]])
+                        next_vs[idx] = next_qvals[idx, nvas[idx][next_action_index]]
+            else:
+                for idx in range(self.minibatch_size):
+                    if idx not in terminals:
+                        next_vs[idx] = np.max(next_qvals[idx, nvas[idx]])
 
             targets = rewards + self.gamma * next_vs
 

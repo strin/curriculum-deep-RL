@@ -332,8 +332,8 @@ class DQN(Qfunc):
         Initialize the deep Q neural network.
         '''
         # construct computation graph for forward pass
-        self.states, self.action_values, model = self.arch_func()
-        self.params = sum([layer.params for layer in model.values()], [])
+        self.states, self.action_values, self.model = self.arch_func
+        self.params = sum([layer.params for layer in self.model.values()], [])
 
         self.fprop = theano.function(inputs=[self.states],
                                      outputs=self.action_values,

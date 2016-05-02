@@ -101,8 +101,9 @@ def plot_xye(x, y, err, names=None, xlabel='x', ylabel='y', title=''):
     traces = []
     traces_std = []
 
-    std_colors = ['rgba(44,160,44,0.2)',
-                    'rgba(214,39,40,0.2)',
+    std_colors = ['rgba(44,160,44,%f)',
+                    'rgba(214,39,40,%f)',
+                    'rgba(39,40,243,%f)',
                   ]
 
     for (i, (x, y, e)) in enumerate(zip(xs, ys, err)):
@@ -121,7 +122,7 @@ def plot_xye(x, y, err, names=None, xlabel='x', ylabel='y', title=''):
             x = x + x[::-1],
             y = y_upper + y_lower[::-1],
             fill='tozerox',
-            fillcolor=std_colors[i],
+            fillcolor=std_colors[i] % 0.2,
             line=go.Line(color='transparent'),
             showlegend=False,
             **kwargs
@@ -131,6 +132,7 @@ def plot_xye(x, y, err, names=None, xlabel='x', ylabel='y', title=''):
         trace = go.Scatter(
             x = x,
             y = y,
+            line=dict(color=std_colors[i] % 1.),
             **kwargs
         )
         traces.append(trace)
