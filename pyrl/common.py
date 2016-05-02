@@ -4,3 +4,6 @@ import theano
 import theano.tensor as T
 import random
 import os
+import sys
+
+sys.setrecursionlimit(100000)

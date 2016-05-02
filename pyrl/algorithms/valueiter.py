@@ -546,7 +546,13 @@ class DeepQlearn(object):
 
         if self.target_freq > 0 and self.total_exp % self.target_freq == 0: # update target network.
             print 'updating target network'
+            ## strategy 1. simple pickling.
             self.dqn_frozen = self.dqn.copy()
+            ## strategy 2.copy parameters.
+            #for (name, layer) in self.dqn.model.items():
+            #    source_params = layer.get_params()
+            #    for param in self.dqn_frozen.model[name].params:
+            #        param.set_value(np.array(source_params[param.name], dtype=floatX)) # deep copy.
 
         meta = {
             'next_valid_actions': next_valid_actions
