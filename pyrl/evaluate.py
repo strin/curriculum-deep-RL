@@ -1,6 +1,7 @@
 import numpy as np
 import numpy.random as npr
 from pyrl.tasks.task import Task, task_breakpoint
+from pyrl.prob import choice
 from pyrl.algorithms.valueiter import compute_tabular_value
 
 
@@ -51,6 +52,23 @@ def estimate_temperature(policy, states, valid_actions, entropy = 0.3, tol=1e-1)
             print prob
             return temperature
         iteration += 1
+
+
+class DrunkLearner(object):
+    '''
+    a learner that never learns.
+    '''
+    def __init__(self):
+        self.cum_reward = 0.
+
+
+    def get_action(self, curr_state, valid_actions):
+        action = choice(valid_actions, 1)[0]
+        return action
+
+
+    def send_feedback(self, reward, next_state, next_valid_actions, is_end):
+        self.cum_reward += reward
 
 
 class DumbLearner(object):
