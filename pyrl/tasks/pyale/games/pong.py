@@ -60,11 +60,14 @@ bar1_x, bar2_x = 2 * W , 640 - 3 * W
 bar1_y, bar2_y = 215. , 215.
 circle_x, circle_y = 320.5, 232.5
 bar1_move, bar2_move = 0. , 0.
-speed_x, speed_y, speed_circ, speed_ai = 250., 250., 250., 250
+speed_x, speed_y, speed_circ, = 250., 250., 250.
+speed_me = 250.
+speed_ai = 250. # adjust this parameter to set AI strength.
 base_speed_y = speed_y
 base_speed_x = speed_x
 speed_y = np.sign(npr.randn()) * speed_y # randomize direction.
 ai_speed = 0.
+me_speed = 0.
 bar1_score, bar2_score = 0,0
 
 #clock and font objects
@@ -84,9 +87,9 @@ while not is_end:
             break
         if event.type == KEYDOWN:
             if event.key == K_UP:
-                bar1_move = -ai_speed
+                bar1_move = -me_speed
             elif event.key == K_DOWN:
-                bar1_move = ai_speed
+                bar1_move = me_speed
         elif event.type == KEYUP:
             if event.key == K_UP:
                 bar1_move = 0.
@@ -109,7 +112,7 @@ while not is_end:
 
     bar1_y += bar1_move
 
-# movement of circle
+    # movement of circle
     #clock.tick(30)
     time_passed = 30
     time_sec = time_passed / 1000.0
@@ -117,12 +120,13 @@ while not is_end:
     circle_x += speed_x * time_sec
     circle_y += speed_y * time_sec
     ai_speed = speed_ai * time_sec
+    me_speed = speed_me * time_sec
 #AI of the computer.
     if circle_x >= 320 - C / 2.:
         if npr.rand() < 0.: # random action.
             bar2_y += np.sign(npr.randn()) * ai_speed
         else:
-            noise = 10 * (1 - opening)
+            noise = 20 * (1 - opening) * npr.randn()
             if not bar2_y == circle_y + C / 2.:
                 if bar2_y + H2 / 2. + noise < circle_y :
                     bar2_y += ai_speed
