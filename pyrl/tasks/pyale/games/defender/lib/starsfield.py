@@ -5,7 +5,7 @@ class Starsfield(Surface,object):
     """"""
     def __init__(self):
         scrsize = self.w,self.h = display.get_surface().get_size()
-        Surface.__init__(self,scrsize,SRCALPHA)
+        Surface.__init__(self,scrsize)
         self.foo = 0
         self.l0 = []
         self.l1 = []

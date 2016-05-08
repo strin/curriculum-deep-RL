@@ -202,7 +202,7 @@ class Ship(Rect,object):
         try:
             self.memshield_ = int(os.environ.get('SHIELD_SHIP'))
         except:
-            self.memshield_ = 5000
+            self.memshield_ = 30
 
         self.memshieldmax = self.memshield_
         #~ les bonus doivent avoir un offest en fonction de osdlayer

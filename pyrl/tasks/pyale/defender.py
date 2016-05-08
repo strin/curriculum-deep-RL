@@ -31,7 +31,6 @@ class DefenderSimulator(PygameSimulator):
         exploded = int(game.exploded)
         level_cleared = int(not game.levels)
         score = shot * 1 + exploded * -10. + level_cleared * 10.
-        print 'score', score
         return score
 
 

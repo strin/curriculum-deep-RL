@@ -10,7 +10,7 @@ class Layer(Rect,object):
     
     def __init__(self,rect,alpha,delta):
         Rect.__init__(self,rect)
-        self.surface = Surface(self.size,SRCALPHA)
+        self.surface = Surface(self.size, flags=SRCALPHA, depth=32)
         self.alpha   = alpha
         self.delta   = delta
     
