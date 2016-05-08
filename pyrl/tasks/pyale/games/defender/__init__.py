@@ -38,7 +38,12 @@ class Game(object):
             Levelmess.update(level.__doc__)
             endlevelflag = 0
             while not endlevelflag:
-                for ev in event.get():
+                print 'getting event'
+                game_events = event.get()
+                if not game_events:
+                    game_events.append(event.Event(NOEVENT, {}))
+                print 'done', game_events
+                for ev in game_events:
                     if ev.type == QUIT: exit()
                     statuslevel = level.update()
                     Background.render()
@@ -67,6 +72,7 @@ class Game(object):
                         display.flip() # important for saving "exploded" information
                         return
                 display.flip()
+                print 'flip'
             scr.fill(0)
             Levelmess.update('Thanks for testing')
             Levelmess.render()

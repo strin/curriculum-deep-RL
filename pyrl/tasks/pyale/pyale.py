@@ -121,6 +121,7 @@ class PygameSimulator(object):
                 return
 
             action = self.learner.get_action(curr_state, self.valid_actions)
+            print 'get_action', action
             self.last_action = action
 
         self._last_keys_pressed = self._keys_pressed
