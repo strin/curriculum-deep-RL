@@ -376,6 +376,7 @@ class DeepQlearn(object):
         for param in params:
             l2_penalty += .5 * (param ** 2).sum()
 
+
         cost = mse + self.l2_reg * l2_penalty
 
         reg_vs = []
@@ -388,7 +389,14 @@ class DeepQlearn(object):
             print float(param) * self.minibatch_size / self.memory_size
             prior_action_values = T.matrix('prior_avs')
             reg_vs.append(prior_action_values)
-            cost += float(param) * self.minibatch_size / self.memory_size * T.sqrt(T.mean((action_values - prior_action_values) ** 2))
+            # cost += float(param) * self.minibatch_size / (1 + self.total_exp) * T.mean(abs(action_values - prior_action_values))
+            cost += float(param) * self.minibatch_size * T.mean(abs(action_values - prior_action_values))
+            #cost += float(param) * self.minibatch_size * (T.sum(abs(action_values - prior_action_values))
+            #                                            - T.sum(abs(action_values[T.arange(action_values.shape[0]),
+            #                                                                     last_actions]
+            #                                                     -  prior_action_values[T.arange(action_values.shapes[0]),
+            #                                                                            last_actions]))) \
+            #                                            / (action_values.shapes[0] * (action_values.shapes[1] - 1))
 
         # back propagation.
         updates = optimizers.Adam(cost, params, alpha=self.lr)
@@ -488,7 +496,12 @@ class DeepQlearn(object):
             reg = self.regularizer.get('dqn-q')
             if reg:
                 dqn = reg['dqn']
-                dqn_avs = dqn.fprop(states)
+                #dqn_avs = dqn.fprop(states)
+                dqn_avs = self.dqn_frozen.fprop(states)
+                #dqn_avs = next_qvals
+                #for idx in range(self.minibatch_size):
+                #    if idx not in terminals:
+                #        dqn_avs[idx, :] = 0.
                 reg_vs.append(dqn_avs)
 
 
@@ -500,16 +513,18 @@ class DeepQlearn(object):
             #print 'actions', actions
             nn_error = []
             for nn_it in range(self.nn_num_iter):
-                if self.total_exp % self.target_freq == 0:
-                    print 'value before\n', self.dqn.fprop(states)[range(self.minibatch_size), actions]
+                #if self.target_freq and self.total_exp % self.target_freq == 0:
+                #    print 'value before\n', self.dqn.fprop(states)[range(self.minibatch_size), actions]
                 error = self.bprop(states, actions, targets.flatten(), *reg_vs)
-                if self.total_exp % self.target_freq == 0:
-                    print 'nn_it', nn_it, 'error', error
-                    print 'value after\n', self.dqn.fprop(states)[range(self.minibatch_size), actions]
-                    print 'targets\n', targets
-                    print 'next_qvals\n', next_qvals
-                    print 'rewards', rewards
-                    print 'total_exp', self.total_exp
+                #if self.target_freq and self.total_exp % self.target_freq == 0:
+                #    print 'nn_it', nn_it, 'error', error
+                #    print 'value after\n', self.dqn.fprop(states)[range(self.minibatch_size), actions]
+                #    print 'targets\n', targets
+                #    #print 'dqn vs\n', self.dqn.fprop(states)
+                #    #print 'dqn avs\n', dqn_avs
+                #    print 'next_qvals\n', next_qvals
+                #    print 'rewards', rewards
+                #    print 'total_exp', self.total_exp
                 nn_error.append(float(error))
             self.diagnostics['nn-error'].append(nn_error)
 
@@ -535,6 +550,8 @@ class DeepQlearn(object):
     def get_action(self, curr_state, valid_actions):
         action = self.dqn.get_action(curr_state, valid_actions=valid_actions,
                                      **self.exploration_kwargs)
+        #action = self.dqn.get_action(curr_state, valid_actions=valid_actions,
+        #                             method='softmax', temperature=0.01)
         self.last_valid_actions = valid_actions
         self.last_state = curr_state
         self.last_action = action
@@ -545,7 +562,6 @@ class DeepQlearn(object):
         self.next_valid_actions = next_valid_actions
 
         if self.target_freq > 0 and self.total_exp % self.target_freq == 0: # update target network.
-            print 'updating target network'
             ## strategy 1. simple pickling.
             #self.dqn_frozen = self.dqn.copy()
             ## strategy 2.copy parameters.
