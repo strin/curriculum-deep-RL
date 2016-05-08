@@ -20,7 +20,7 @@ class GridWorld(Task):
 
     actions = [N, E, W, S]
 
-    def __init__(self, grid, action_stoch, goal, rewards, wall_penalty, state_type=np.ndarray):
+    def __init__(self, grid, action_stoch, goal, rewards, wall_penalty, state_type=np.ndarray, time_penalty=-0.01):
         ''' grid is a 2D numpy array with 0 indicates where the agent
             can pass and 1 indicates an impermeable wall.
 
@@ -38,6 +38,7 @@ class GridWorld(Task):
         self.wall_penalty = wall_penalty
         self.rewards = dict(rewards)
         self.env = grid
+        self.time_penalty = time_penalty
 
         # save initial state
         self.init_goal = dict(goal)
@@ -190,10 +191,9 @@ class GridWorld(Task):
         # record history.
         self.last_action = action
         self.last_state = self.curr_state
-        self.num_steps += 1
 
         # run step.
-        reward = 0.
+        reward = self.time_penalty
 
         # update state_3d matrix
         self.state_3d[0, self.curr_pos[0], self.curr_pos[1]] = 0.
@@ -216,12 +216,13 @@ class GridWorld(Task):
         # update goal.
         if self.curr_pos in self.goal:
             self.state_3d[1, self.curr_pos[0], self.curr_pos[1]] = 0.
-            reward = float(self.rewards[self.curr_pos])
+            reward += float(self.rewards[self.curr_pos])
             if id(self.goal) != id(self.rewards):
                 del self.goal[self.curr_pos]
             del self.rewards[self.curr_pos]
 
         self.cum_reward += reward
+        self.num_steps += 1
         return reward
 
     def is_end(self):
@@ -229,7 +230,7 @@ class GridWorld(Task):
             return True
         return len(self.goal) == 0
 
-    def visualize(self, fig = 1, fname = None, format='png'):
+    def visualize(self, fig = 1, fname = None, format='png', qval=None):
         fig = plt.figure(fig, figsize=(5,5))
         plt.clf()
         ax = fig.add_axes([0.0, 0.0, 1., 1.])
@@ -237,6 +238,7 @@ class GridWorld(Task):
         for g in self.goal.keys():
             circle = plt.Circle(g, radius=.3, color='w')
             ax.add_artist(circle)
+        # plot pacman.
         (x, y) = self.curr_pos
         y = self.grid.shape[0] - 1 - y
         x /= float(self.grid.shape[1])
@@ -245,6 +247,24 @@ class GridWorld(Task):
         im = plt.imread(__file__[:__file__.rfind('/')] + '/pacman.png')
         res = axicon.imshow(im, interpolation='nearest')
         axicon.axis('off')
+        # plot qval.
+        if not qval is None:
+            axicon = fig.add_axes([0.8, 0.8, 0.2, 0.2])
+            axicon.bar(np.arange(self.num_actions) , list(qval), color='red')
+            plt.ylim([0.0, 1.0])
+            axicon.set_xticks(np.arange(self.num_actions) + 0.5)
+            axicon.set_xticklabels(['S', 'E', 'W', 'N'])
+            axicon.set_frame_on(False)
+            axicon.set_autoscale_on(False)
+            axicon.get_yaxis().set_visible(False)
+            for tic in axicon.xaxis.get_major_ticks():
+                tic.tick1On = tic.tick2On = False
+            axicon.xaxis.label.set_color('white')
+            axicon.tick_params(axis='x', colors='white')
+            axicon.patch.set_facecolor('white')
+            axicon.patch.set_alpha(0.1)
+            #axicon.axis('off')
+
         ax.axis('off')
         if fname:
             plt.savefig(fname, format=format)
@@ -252,11 +272,14 @@ class GridWorld(Task):
             plt.show()
         return res
 
+    def __repr__(self):
+        return str(self.curr_pos) + ' -> ' + ','.join([str(key) for key in self.goal.keys()])
+
 
 class GridWorldFixedStart(GridWorld):
-    def __init__(self, start_pos, grid, action_stoch, goal, rewards, wall_penalty, state_type):
+    def __init__(self, start_pos, grid, action_stoch, goal, rewards, wall_penalty, state_type, time_penalty=0.01):
         self.start_pos = start_pos
-        GridWorld.__init__(self, grid, action_stoch, goal, rewards, wall_penalty, state_type)
+        GridWorld.__init__(self, grid, action_stoch, goal, rewards, wall_penalty, state_type, time_penalty=time_penalty)
         assert(start_pos in self.free_pos)
 
     def reset(self):
@@ -274,7 +297,7 @@ class GridWorldMultiGoal(GridWorld):
     A GridWorld task where the agent is asked to visit a sequence of tasks.
     A reward 1. is given only if the agent visited the goals in correct order and got to the last one.
     '''
-    def __init__(self, start_pos, start_phase, grid, action_stoch, goals, wall_penalty=0.):
+    def __init__(self, start_pos, start_phase, grid, action_stoch, goals, wall_penalty=0., time_penalty=0.01):
         self.start_pos = start_pos
         self.start_phase = start_phase
         self.goals = goals
@@ -284,7 +307,8 @@ class GridWorldMultiGoal(GridWorld):
 
         GridWorld.__init__(self, grid, action_stoch,
                 {self.goal_tuple: 1.0}, rewards={self.goal_tuple: 1.},
-                wall_penalty=wall_penalty, state_type=np.ndarray)
+                wall_penalty=wall_penalty, state_type=np.ndarray,
+                time_penalty=time_penalty)
 
         assert(start_pos in self.free_pos)
 
