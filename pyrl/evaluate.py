@@ -92,12 +92,12 @@ class DumbLearner(object):
         pass # ignore, 'caz i am dumb learner.
 
 
-def reward_simulator_samples(dqn, simulator, num_trials=10, entropy=0.2, num_frames=10000, callback=None):
+def reward_simulator_samples(dqn, simulator, num_trials=10, entropy=0.2, max_steps=None, callback=None):
     total_reward = []
     for ni in range(num_trials):
         learner = DumbLearner(dqn, entropy=entropy)
-        simulator.run(learner, callback=callback)
-        total_reward.append(simulator.cum_reward)
+        cum_reward = simulator.run(learner, callback=callback, max_steps=max_steps)
+        total_reward.append(cum_reward)
     return total_reward
 
 
