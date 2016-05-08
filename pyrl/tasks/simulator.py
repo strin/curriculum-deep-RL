@@ -7,9 +7,10 @@ class TaskSimulator(object):
                 send_feedback(reward)   # send reward to agent for last action.
         '''
         self.task = task
+        self.total_steps = 0
 
 
-    def run(self, learner, callback=None):
+    def run(self, learner, max_steps=None, callback=None):
         task = self.task
         num_steps = 0.
         cum_reward = 0.
@@ -24,6 +25,9 @@ class TaskSimulator(object):
             #    meta['curr_valid_actions'] = []
             #    self._end_episode(0, meta)
             #    break
+            if max_steps is not None and num_steps > max_steps:
+                break
+
             if callback:
                 callback()
 
@@ -42,5 +46,7 @@ class TaskSimulator(object):
             learner.send_feedback(reward, next_state, next_valid_actions, task.is_end())
 
             curr_state = next_state
+            num_steps += 1
         task.reset()
+        self.total_steps += num_steps
         return cum_reward
