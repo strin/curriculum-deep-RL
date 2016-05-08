@@ -126,9 +126,9 @@ while not is_end:
         if npr.rand() < 0.: # random action.
             bar2_y += np.sign(npr.randn()) * ai_speed
         else:
-            noise = 20 * (1 - opening) * npr.randn()
+            noise = 15 * (1 - opening) * npr.randn()
             if not bar2_y == circle_y + C / 2.:
-                if bar2_y + H2 / 2. + noise < circle_y :
+                if bar2_y + H2 / 2. + noise < circle_y + C / 2.:
                     bar2_y += ai_speed
                 if  bar2_y + H2/ 2.  + noise > circle_y  + C / 2.:
                     bar2_y -= ai_speed
@@ -143,14 +143,14 @@ while not is_end:
     if circle_x <= bar1_x + W and circle_x >= bar1_x + W - C:
         if circle_y >= bar1_y - C / 2. and circle_y <= bar1_y + H1 - C / 2.:
             circle_x = bar1_x + W
-            speed_x = base_speed_x + npr.randn() * 20
-            speed_y = speed_y + abs(npr.randn()) * 10 * (np.sign(bar1_move))
+            speed_x = base_speed_x + npr.randn() * 5
+            speed_y = speed_y + abs(npr.randn()) * 5 * (np.sign(bar1_move))
             opening = 0
     if circle_x >= bar2_x - C and circle_x <= bar2_x:
         if circle_y >= bar2_y - C / 2. and circle_y <= bar2_y + H2 - C / 2.:
             circle_x = bar2_x - C
-            speed_x = -base_speed_x + npr.randn() * 20
-            speed_y = speed_y + abs(npr.randn()) * 10 * (np.sign(ai_speed))
+            speed_x = -base_speed_x + npr.randn() * 5
+            speed_y = speed_y + abs(npr.randn()) * 5 * (np.sign(ai_speed))
             opening = 0
     if circle_x < 5.:
         bar2_score += 1
