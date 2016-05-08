@@ -337,7 +337,8 @@ class DQN(Qfunc):
 
         self.fprop = theano.function(inputs=[self.states],
                                      outputs=self.action_values,
-                                     name='fprop')
+                                     name='fprop',
+                                     allow_input_downcast=True)
 
     def copy(self):
         import dill as pickle
