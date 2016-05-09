@@ -58,7 +58,8 @@ circle.set_colorkey((0,0,0))
 # some definitions
 bar1_x, bar2_x = 2 * W , 640 - 3 * W
 bar1_y, bar2_y = 215. , 215.
-circle_x, circle_y = 320.5, 232.5
+init_circle_y = lambda: (640 - 60) * npr.rand() + 30
+circle_x, circle_y = 320.5, init_circle_y()
 bar1_move, bar2_move = 0. , 0.
 speed_x, speed_y, speed_circ, = 250., 250., 250.
 speed_me = 250.
@@ -154,14 +155,14 @@ while not is_end:
             opening = 0
     if circle_x < 5.:
         bar2_score += 1
-        circle_x, circle_y = 307.5, 232.5
+        circle_x, circle_y = 307.5, init_circle_y()
         speed_y = base_speed_y * np.sign(npr.randn())
         speed_x = abs(base_speed_x)
         bar1_y, bar2_y = 215., 215.
         opening = 1
     elif circle_x > 620.:
         bar1_score += 1
-        circle_x, circle_y = 307.5, 232.5
+        circle_x, circle_y = 307.5, init_circle_y() 
         speed_y = base_speed_y * np.sign(npr.randn())
         speed_x = abs(base_speed_x)
         bar1_y, bar2_y = 215., 215.
