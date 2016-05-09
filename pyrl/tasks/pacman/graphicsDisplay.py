@@ -17,10 +17,10 @@ from game import Directions
 # Most code by Dan Klein and John Denero written or rewritten for cs188, UC Berkeley.
 # Some code from a Pacman implementation by LiveWires, and used / modified with permission.
 
-DEFAULT_GRID_SIZE = 30.0
+DEFAULT_GRID_SIZE = 100.0
 INFO_PANE_HEIGHT = 35
-BACKGROUND_COLOR = formatColor(0,0,0)
-WALL_COLOR = formatColor(0.0/255.0, 51.0/255.0, 255.0/255.0)
+BACKGROUND_COLOR = formatColor(255,255,255)
+WALL_COLOR = formatColor(0.0/255.0, 0.0/255.0, 0.0/255.0)
 INFO_PANE_COLOR = formatColor(.4,.4,0)
 SCORE_COLOR = formatColor(.9, .9, .9)
 PACMAN_OUTLINE_WIDTH = 2
@@ -54,12 +54,12 @@ SCARED_COLOR = formatColor(1,1,1)
 
 GHOST_VEC_COLORS = map(colorToVector, GHOST_COLORS)
 
-PACMAN_COLOR = formatColor(255.0/255.0,255.0/255.0,61.0/255)
+PACMAN_COLOR = formatColor(255.0/255.0,255.0/255.0,51.0/255)
 PACMAN_SCALE = 0.5
 #pacman_speed = 0.25
 
 # Food
-FOOD_COLOR = formatColor(1,1,1)
+FOOD_COLOR = formatColor(255.0 / 255.0,78.0 / 255.0,44.0 / 255.0)
 FOOD_SIZE = 0.1
 
 # Laser
@@ -67,7 +67,7 @@ LASER_COLOR = formatColor(1,0,0)
 LASER_SIZE = 0.02
 
 # Capsule graphics
-CAPSULE_COLOR = formatColor(1,1,1)
+CAPSULE_COLOR = formatColor(255.0 / 255.0, 78.0 / 255.0, 44.0 / 255.0)
 CAPSULE_SIZE = 0.25
 
 # Drawing walls

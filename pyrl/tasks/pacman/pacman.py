@@ -42,8 +42,6 @@ from util import manhattanDistance
 import layout
 import sys, random, os
 
-from pyrl.tasks.task import ContinuousMDP, DiscreteMDP
-
 ###################################################
 # YOUR INTERFACE TO THE PACMAN WORLD: A GameState #
 ###################################################

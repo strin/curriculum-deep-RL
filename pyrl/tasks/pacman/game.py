@@ -602,6 +602,7 @@ class Game:
 
     def run(self):
         while not self.gameOver:
+            import pdb; pdb.set_trace()
             self.run_one()
 
     def run_one(self):
