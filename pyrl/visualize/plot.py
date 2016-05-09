@@ -115,9 +115,6 @@ def plot_xye(x, y, err, names=None, xlabel='x', ylabel='y', title=''):
         y_upper = list(y + e)
         y_lower = list(y - e)
         x = list(x)
-        print 'y-upper', y_upper
-        print 'y-lower', y_lower
-        print 'y', y
         trace_std = go.Scatter(
             x = x + x[::-1],
             y = y_upper + y_lower[::-1],
