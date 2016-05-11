@@ -156,3 +156,10 @@ def rgb2yuv(pic):
     res[:, :, 1] = -0.14713 * pic[:, :, 0] -0.28886 * pic[:, :, 1] + 0.436 * pic[:, :, 2]
     res[:, :, 2] = 0.615 * pic[:, :, 0] -0.51499 * pic[:, :, 1] - 0.10001 * pic[:, :, 2]
     return res
+
+
+def get_val(dic, key, default):
+    val = dic.get(key)
+    if val is None:
+        return default
+    return val

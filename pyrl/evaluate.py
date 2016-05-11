@@ -1,7 +1,7 @@
-import numpy as np
-import numpy.random as npr
+from pyrl.common import *
 from pyrl.tasks.task import Task, task_breakpoint
 from pyrl.prob import choice
+from pyrl.utils import get_val
 from pyrl.algorithms.valueiter import compute_tabular_value
 
 
@@ -75,15 +75,27 @@ class DumbLearner(object):
     '''
     a learner that never learns.
     '''
-    def __init__(self, dqn, entropy=0.2):
+    def __init__(self, dqn, method='eps-greedy', **kwargs):
         self.dqn = dqn
-        self.entropy = entropy
+        self.method = method
+        self.kwargs = kwargs
         self.cum_reward = 0.
 
 
     def get_action(self, curr_state, valid_actions):
-        temperature = estimate_temperature(self.dqn, [curr_state], [valid_actions], entropy=self.entropy, tol=1e-2)
-        action = self.dqn.get_action(curr_state, valid_actions=valid_actions, method='softmax', temperature=temperature)
+        if self.method == 'eps-greedy':
+            epsilon = get_val(self.kwargs, 'epsilon', 0.05)
+            action = self.dqn.get_action(curr_state, valid_actions=valid_actions, method='eps-greedy', epsilon=epsilon)
+        elif self.method == 'softmax-entropy':
+            entropy = get_val(self.kwargs, 'entropy', 0.2)
+            temperature = estimate_temperature(self.dqn, [curr_state], [valid_actions], entropy=entropy, tol=1e-2)
+            action = self.dqn.get_action(curr_state, valid_actions=valid_actions, method='softmax', temperature=temperature)
+        elif self.method == 'softmax-l2':
+            av = self.dqn.av(curr_state)
+            temperature = get_val(self.kwargs, 'temperature', 1.)
+            temperature *= npla.norm(av)
+            action = self.dqn.get_action(curr_state, valid_actions=valid_actions, method='softmax', temperature=temperature)
+
         return action
 
 
@@ -92,10 +104,10 @@ class DumbLearner(object):
         pass # ignore, 'caz i am dumb learner.
 
 
-def reward_simulator_samples(dqn, simulator, num_trials=10, entropy=0.2, max_steps=None, callback=None):
+def reward_simulator_samples(dqn, simulator, num_trials=10, max_steps=None, callback=None, method='eps-greedy', **kwargs):
     total_reward = []
     for ni in range(num_trials):
-        learner = DumbLearner(dqn, entropy=entropy)
+        learner = DumbLearner(dqn, method=method, **kwargs)
         cum_reward = simulator.run(learner, callback=callback, max_steps=max_steps)
         total_reward.append(cum_reward)
     return total_reward
