@@ -390,13 +390,16 @@ class DeepQlearn(object):
             prior_action_values = T.matrix('prior_avs')
             reg_vs.append(prior_action_values)
             # cost += float(param) * self.minibatch_size / (1 + self.total_exp) * T.mean(abs(action_values - prior_action_values))
-            cost += float(param) * self.minibatch_size * T.mean(abs(action_values - prior_action_values))
-            #cost += float(param) * self.minibatch_size * (T.sum(abs(action_values - prior_action_values))
-            #                                            - T.sum(abs(action_values[T.arange(action_values.shape[0]),
-            #                                                                     last_actions]
-            #                                                     -  prior_action_values[T.arange(action_values.shapes[0]),
-            #                                                                            last_actions]))) \
-            #                                            / (action_values.shapes[0] * (action_values.shapes[1] - 1))
+            cost = cost / action_values.shape[1] + T.mean(T.sqr(action_values - prior_action_values))
+            #cost_e = (T.sum((action_values - prior_action_values)**2)
+            #       - T.sum((action_values[T.arange(action_values.shape[0]),
+            #                                     last_actions]
+            #             -  prior_action_values[T.arange(action_values.shape[0]),
+            #                                    last_actions]
+            #               )**2)
+            #        ) / (action_values.shape[0] * action_values.shape[1])
+
+            #cost = cost / action_values.shape[1] + cost_e
 
         # back propagation.
         updates = optimizers.Adam(cost, params, alpha=self.lr)
@@ -491,7 +494,7 @@ class DeepQlearn(object):
             #    print 'rewards', rewards
             #    print 'next_vs', next_vs
 
-            # regularizations.
+            # using regularization.
             reg_vs = []
             reg = self.regularizer.get('dqn-q')
             if reg:
@@ -503,6 +506,7 @@ class DeepQlearn(object):
                 #    if idx not in terminals:
                 #        dqn_avs[idx, :] = 0.
                 reg_vs.append(dqn_avs)
+
 
 
             ## diagnostics.
@@ -548,6 +552,23 @@ class DeepQlearn(object):
 
 
     def get_action(self, curr_state, valid_actions):
+        # using interpolation.
+        reg = self.regularizer.get('dqn-uct')
+        if reg:
+            uct = reg['uct']
+            av = self.dqn.av(curr_state)
+            prev_av = reg['dqn'].av(curr_state)
+            c = uct.count_s(curr_state)
+            ratio = np.sqrt(1 / (1 + float(c)))
+            final_av = prev_av * ratio + av * (1 - ratio)
+            action = np.argmax(final_av)
+            uct.visit(curr_state, action)
+            self.last_valid_actions = valid_actions
+            self.last_state = curr_state
+            self.last_action = action
+            return action
+
+        # normal get_action.
         action = self.dqn.get_action(curr_state, valid_actions=valid_actions,
                                      **self.exploration_kwargs)
         #action = self.dqn.get_action(curr_state, valid_actions=valid_actions,
