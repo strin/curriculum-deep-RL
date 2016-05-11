@@ -127,7 +127,7 @@ while not is_end:
         if npr.rand() < 0.: # random action.
             bar2_y += np.sign(npr.randn()) * ai_speed
         else:
-            noise = 15 * (1 - opening) * npr.randn()
+            noise = 5 * (1 - opening) * npr.randn()
             if not bar2_y == circle_y + C / 2.:
                 if bar2_y + H2 / 2. + noise < circle_y + C / 2.:
                     bar2_y += ai_speed
