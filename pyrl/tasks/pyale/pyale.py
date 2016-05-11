@@ -52,7 +52,7 @@ def function_intercept(intercepted_func, intercepting_func, pass_on=False):
     return wrap
 
 class PygameSimulator(object):
-    def __init__(self, game_module_name, valid_events, state_type='pixel', frames_per_action=2):
+    def __init__(self, game_module_name, valid_events, state_type='pixel', frames_per_action=2, pass_event=True):
         self.game_module_name = game_module_name
         self.game_module = None # cached game module
         self.game_code = None
@@ -64,12 +64,14 @@ class PygameSimulator(object):
         self.state_type = state_type
         self.frames_per_action = frames_per_action
         self.num_frames = 4
+        self.pass_event = pass_event
 
     def _get_attr(self, name):
         if not self.game_module: # dynamically load library if not found.
             game_frame = [frame for frame in inspect.stack()
-                          if frame[1].find('pyrl/tasks/pyale/games') != -1][0][0]
+                          if frame[1].find('pyrl/tasks/pyale/games') != -1][-1][0]
             self.game_module = inspect.getmodule(game_frame)
+            print 'module', self.game_module
         return getattr(self.game_module, name)
 
 
@@ -156,7 +158,7 @@ class PygameSimulator(object):
             for type_filter in args:
                 if type_filter == QUIT:
                     if type_filter == QUIT:
-                        if self.pass_quit_event:
+                        if self.pass_event:
                             for e in _:
                                 if e.type == QUIT:
                                     result.append(e)
