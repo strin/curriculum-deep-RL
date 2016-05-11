@@ -65,7 +65,6 @@ class PygameSimulator(object):
         self.frames_per_action = frames_per_action
         self.num_frames = 4
 
-
     def _get_attr(self, name):
         if not self.game_module: # dynamically load library if not found.
             game_frame = [frame for frame in inspect.stack()
@@ -81,6 +80,14 @@ class PygameSimulator(object):
             img = rgb2yuv(img)[:, :, 0] # get Y channel, according to Nature paper.
             img = imresize(img, (84, 84), interp='bicubic')
             return img / floatX(255.0)
+        elif self.state_type == 'ram':
+            return self._get_ram_state()
+        else:
+            raise NotImplementedError()
+
+
+    def _get_ram_state(self):
+        raise NotImplementedError()
 
 
     def _get_state(self):
@@ -88,20 +95,24 @@ class PygameSimulator(object):
 
 
     def _on_screen_update(self, _, *args, **kwargs):
-        self.num_steps += 1
+        self.total_frames += 1
         is_end = self.is_end()
 
-        if not is_end and (self.num_steps-1) % self.frames_per_action > 0:
+        if not is_end and (self.total_frames-1) % self.frames_per_action > 0:
             if self.callback: # TODO: callback on skip steps. now callback is only used for videos.
                 self.callback()
 
             return
 
+
         score = self.get_score()
         reward = score - self.curr_score
         self.cum_reward += reward
         self.curr_score = score
-        self.curr_screen_rgb = pygame.surfarray.array3d(pygame.display.get_surface())
+
+        if self.state_type == 'pixel':
+            self.curr_screen_rgb = pygame.surfarray.array3d(pygame.display.get_surface())
+
         frame = self._get_frame()
         self.frames.append(frame)
 
@@ -121,7 +132,7 @@ class PygameSimulator(object):
                 return
 
             action = self.learner.get_action(curr_state, self.valid_actions)
-            print 'get_action', action
+            self.total_steps += 1
             self.last_action = action
 
         self._last_keys_pressed = self._keys_pressed
@@ -181,7 +192,8 @@ class PygameSimulator(object):
         self.last_action = None
         self.cum_reward = 0
         self.curr_score = 0
-        self.num_steps = 0
+        self.total_frames = 0
+        self.total_steps = 0
         self.frames = []
         #pygame.time.get_ticks = function_intercept(pygame.time.get_ticks, self.get_game_time_ms)
         # run game using dynamic importing.
