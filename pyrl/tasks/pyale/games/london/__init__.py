@@ -47,7 +47,7 @@ class Data:
 		self.WINDOWWIDTH, self.WINDOWHEIGHT = (600, 800)
 		input.Input.winSize = [self.WINDOWWIDTH, self.WINDOWHEIGHT]
 
-		self.screen = pygame.display.set_mode((self.WINDOWWIDTH, self.WINDOWHEIGHT))
+		self.screen = pygame.display.set_mode((self.WINDOWWIDTH, self.WINDOWHEIGHT), 0, 32)
 		self.FPSClock = pygame.time.Clock()
                 print pygame.time.Clock()
 		self.FPS = 60

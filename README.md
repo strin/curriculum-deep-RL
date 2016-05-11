@@ -6,11 +6,11 @@ We first develop a learning environment based on PyGames~(\href{http://www.pygam
 
 
 
-<video src="https://www.dropbox.com/s/9r86ivqwb89pl0v/pong.m4v?dl=1" width="300" height="225" loop preload autoplay></video>
+<img src="http://im2.ezgif.com/tmp/ezgif-2839561517.gif" width="300" height="225"></img>
 
 
-<video src="https://www.dropbox.com/s/hc113j0w93yvbwu/defender.m4v?dl=1" width="300" height="450" loop preload autoplay></video>
+<img src="http://im2.ezgif.com/tmp/ezgif-1030067887.gif" width="300" height="450"></img>
 
-<video src="https://www.dropbox.com/s/v5a21s137h1r9z4/london.m4v?dl=1" width="300" height="400" loop preload autoplay></video>
+<img src="http://im2.ezgif.com/tmp/ezgif-2081494702.gif" width="300" height="400"></img>
 
-
+Video converted by [ezgif.com](http://ezgif.com/video-to-gif)
