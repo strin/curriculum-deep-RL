@@ -50,7 +50,7 @@ bar2.fill((213, 130, 74))
 circ_sur = pygame.Surface((C,C))
 # circ = pygame.draw.circle(circ_sur,(0,255,0),(C/2,C/2),C/2) # circle shape
 circ = circ_sur # rect shape
-circ.fill((255, 255, 255)) 
+circ.fill((255, 255, 255))
 circle = circ_sur.convert()
 circle.set_colorkey((0,0,0))
 
@@ -68,6 +68,7 @@ base_speed_y = speed_y
 base_speed_x = speed_x
 speed_y = np.sign(npr.randn()) * speed_y # randomize direction.
 ai_speed = 0.
+ai_direction = 1.
 me_speed = 0.
 bar1_score, bar2_score = 0,0
 
@@ -127,11 +128,12 @@ while not is_end:
         if npr.rand() < 0.: # random action.
             bar2_y += np.sign(npr.randn()) * ai_speed
         else:
-            noise = 10 * (1 - opening) * npr.randn()
+            noise = 0 * (1 - opening) * npr.randn()
             if bar2_y + H2 / 2. + noise < circle_y + C / 2.:
-                bar2_y += ai_speed
+                ai_direction = 1.
             if  bar2_y + H2/ 2.  + noise > circle_y  + C / 2.:
-                bar2_y -= ai_speed
+                ai_direction = -1.
+            bar2_y += ai_direction * ai_speed
 
     if bar1_y >= 480. - H1: bar1_y = 480. - H1
     elif bar1_y <= 10. : bar1_y = 10.
@@ -141,14 +143,14 @@ while not is_end:
     if circle_x <= bar1_x + W and circle_x >= bar1_x + W - C:
         if circle_y >= bar1_y - C / 2. and circle_y <= bar1_y + H1 - C / 2.:
             circle_x = bar1_x + W
-            speed_x = base_speed_x + npr.randn() * 10
-            speed_y = speed_y + abs(npr.randn()) * 10 * (np.sign(bar1_move))
+            speed_x = base_speed_x + npr.randn() * 3
+            speed_y = speed_y + abs(npr.randn()) * 3 * (np.sign(bar1_move))
             opening = 0
     if circle_x >= bar2_x - C and circle_x <= bar2_x:
         if circle_y >= bar2_y - C / 2. and circle_y <= bar2_y + H2 - C / 2.:
             circle_x = bar2_x - C
-            speed_x = -base_speed_x + npr.randn() * 10
-            speed_y = speed_y + abs(npr.randn()) * 10 * (np.sign(ai_speed))
+            speed_x = -base_speed_x + npr.randn() * 3
+            speed_y = speed_y + abs(npr.randn()) * 3 * (np.sign(ai_direction))
             opening = 0
     if circle_x < 5.:
         bar2_score += 1
