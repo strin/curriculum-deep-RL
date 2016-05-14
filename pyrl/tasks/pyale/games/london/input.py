@@ -24,10 +24,6 @@ class Input:
 
 
         for event in pygame.event.get():
-            if self.num_frames % 10: # controls CD of bombing.
-                self.mousePressed = False
-                self.mouseUnpressed = 1
-                continue
             # replace mouse events with key events.
             if event.type == KEYDOWN:
                 angle = ord(event.key) - ord('0') # 0 - 180
@@ -45,7 +41,6 @@ class Input:
                 self.mousePressed = False
                 self.mouseUnpressed = 1
 
-            '''
             if event.type == MOUSEMOTION:
                 self.mousePos = list(event.pos)
             elif event.type == MOUSEBUTTONDOWN:
@@ -54,7 +49,6 @@ class Input:
             elif event.type == MOUSEBUTTONUP:
                 self.mousePressed = False
                 self.mouseUnpressed = event.button
-            '''
 
             if event.type == KEYDOWN:
                 if event.key not in self.pressedKeys:

@@ -5,6 +5,8 @@ import pygame, random, time, math, sound
 from particle import SmokeSpawner, Explosion
 from random import randint
 from math import atan2, degrees, pi, cos, sin
+import os
+from pyrl.utils import get_val
 
 
 class AAGun(pygame.sprite.Sprite):
@@ -284,6 +286,11 @@ class Bomb(pygame.sprite.Sprite):
 		self.add(data.bombs)
 
 		self.baseImage = Bomb.baseImage
+                self.baseImageSize = self.baseImage.get_size()
+                bomb_size = int(get_val(os.environ, 'BOMB', 1.))
+                self.baseImage = pygame.transform.scale(self.baseImage,
+                        (self.baseImageSize[0] * bomb_size, 
+                         self.baseImageSize[1] * bomb_size))
 		self.rotation = 0.0
 		self.rect = self.baseImage.get_rect(topleft=topleft)
 		self.yCoord = topleft[1] # float for accuracy

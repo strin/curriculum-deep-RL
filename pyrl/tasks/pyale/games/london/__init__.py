@@ -25,7 +25,7 @@ class StateHandler:
 	def update(self):
 		self.data.input.get(self.data, (self.gameHandler is not None and not self.gameHandler.gameOver))
 		#self.data.dt = self.data.FPSClock.tick(self.data.FPS) / 100.0
-                self.data.dt = 0.3
+                self.data.dt = 0.8
 
 		# update game/menu objs
 		if self.gameHandler:
@@ -35,7 +35,6 @@ class StateHandler:
 			done = self.mainMenu.update(self.data)
 			if done:
 				self.gameHandler = game.GameHandler(self.data)
-
 
 		pygame.display.update()
 

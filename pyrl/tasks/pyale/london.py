@@ -26,13 +26,12 @@ class LondonSimulator(PygameSimulator):
             game_handler = self._get_attr('stateHandler').gameHandler
             if game_handler is None:
                 return False
-            print game_handler.gameOver
         except:
             return False
 
 
     def get_score(self):
-        return self._get_attr('stateHandler').data.score
+        return self._get_attr('stateHandler').data.score / 100.
 
 
 if __name__ == '__main__':
