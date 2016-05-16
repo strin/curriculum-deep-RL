@@ -74,7 +74,6 @@ class PygameSimulator(object):
             game_frame = [frame for frame in inspect.stack()
                           if frame[1].find('pyrl/tasks/pyale/games') != -1][-1][0]
             self.game_module = inspect.getmodule(game_frame)
-            print 'module', self.game_module
         return getattr(self.game_module, name)
 
 
@@ -227,8 +226,8 @@ class PygameSimulator(object):
 
         try:
             if self.game_module:
-                from IPython.lib import deepreload
-                deepreload.reload(self.game_module, exclude=['sys', 'os.path', 'builtins', '__main__', 'pygame'])
+                from pyrl.tasks.pyale.reload import reload
+                reload(self.game_module, exclude=['sys', 'os.path', 'builtins', '__main__', 'pygame'])
             else:
                 pygame.display.flip = function_intercept(pygame.display.flip, self._on_screen_update)
                 pygame.display.update = function_intercept(pygame.display.update, self._on_screen_update)
