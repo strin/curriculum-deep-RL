@@ -41,7 +41,9 @@ if __name__ == '__main__':
         data = pygame.image.tostring(pygame.display.get_surface(), 'RGB')
         vr.write_frame(data)
     make_vr = lambda name: RawVideoRecorder(name, (600, 800))
-    defender = LondonSimulator(state_type='pixel')
+    london = LondonSimulator(state_type='pixel')
+    london.run(DrunkLearner(), callback=None)
+    print 'screen size', london.screen_size
+    london.run(DrunkLearner(), callback=callback)
     vr = make_vr('test.m4v')
-    defender.run(DrunkLearner(), callback=callback)
     vr.stop()

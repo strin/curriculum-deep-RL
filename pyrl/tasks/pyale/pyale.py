@@ -11,6 +11,7 @@ import subprocess
 import dill
 import base64
 import select
+import traceback
 
 import pygame.image
 from pygame.event import Event
@@ -25,6 +26,7 @@ import pygame.key
 import pygame.surfarray
 import imp
 import os
+import re
 import inspect
 
 def function_intercept(intercepted_func, intercepting_func, pass_on=False):
@@ -50,6 +52,7 @@ def function_intercept(intercepted_func, intercepting_func, pass_on=False):
         return intercepted_results
 
     return wrap
+
 
 class PygameSimulator(object):
     def __init__(self, game_module_name, valid_events, state_type='pixel', frames_per_action=2, pass_event=True):
@@ -94,6 +97,16 @@ class PygameSimulator(object):
 
     def _get_state(self):
         return np.array(self.frames)
+
+    
+    @property
+    def screen_size(self):
+        surface = pygame.display.get_surface()
+        if not surface:
+            return None
+        width = surface.get_width()
+        height = surface.get_height()
+        return (width, height)
 
 
     def _on_screen_update(self, _, *args, **kwargs):
@@ -212,17 +225,22 @@ class PygameSimulator(object):
         #exec(self.game_code, self.game_module.__dict__)
 
 
-        if self.game_module:
-            reload(self.game_module)
-        else:
-            pygame.display.flip = function_intercept(pygame.display.flip, self._on_screen_update)
-            pygame.display.update = function_intercept(pygame.display.update, self._on_screen_update)
-            pygame.event.get = function_intercept(pygame.event.get, self._on_event_get)
-            pygame.time.Clock = function_intercept(pygame.time.Clock, self._on_time_clock)
-            sys.exit = function_intercept(sys.exit, self._on_exit) # TODO: this doesn't work.
-            with Timer('running game ' + self.game_module_name):
-                exec('''import pyrl.tasks.pyale.games.%s as the_game''' % self.game_module_name)
-            self.game_module = the_game
+        try:
+            if self.game_module:
+                from IPython.lib import deepreload
+                deepreload.reload(self.game_module, exclude=['sys', 'os.path', 'builtins', '__main__', 'pygame'])
+            else:
+                pygame.display.flip = function_intercept(pygame.display.flip, self._on_screen_update)
+                pygame.display.update = function_intercept(pygame.display.update, self._on_screen_update)
+                pygame.event.get = function_intercept(pygame.event.get, self._on_event_get)
+                pygame.time.Clock = function_intercept(pygame.time.Clock, self._on_time_clock)
+                sys.exit = function_intercept(sys.exit, self._on_exit) # TODO: this doesn't work.
+                with Timer('running game ' + self.game_module_name):
+                    exec('''import pyrl.tasks.pyale.games.%s as the_game''' % self.game_module_name)
+                self.game_module = the_game
+        except Exception as e:
+            print '[Exception]', e.message
+            traceback.print_exc()
 
         return self.cum_reward
 

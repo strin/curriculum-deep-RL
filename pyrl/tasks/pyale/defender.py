@@ -76,4 +76,14 @@ class DefenderRAMSimulator(DefenderSimulator):
 if __name__ == '__main__':
     # defender = DefenderSimulator(state_type='pixel')
     defender = DefenderRAMSimulator()
+    import os
+    os.environ.update({
+        'SHIELD_SHIP': '1',
+        'SHIELD_ENEMY': '30'
+    })
+    defender.run(DrunkLearner())
+    os.environ.update({
+        'SHIELD_SHIP': '1000',
+        'SHIELD_ENEMY': '30'
+    })
     defender.run(DrunkLearner())
