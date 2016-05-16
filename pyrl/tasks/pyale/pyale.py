@@ -227,8 +227,8 @@ class PygameSimulator(object):
 
         try:
             if self.game_module:
-                from IPython.lib import deepreload
-                deepreload.reload(self.game_module, exclude=['sys', 'os.path', 'builtins', '__main__', 'pygame'])
+                from pyrl.tasks.pyale.reload import reload
+                reload(self.game_module, exclude=['sys', 'os.path', 'builtins', '__main__', 'pygame'])
             else:
                 pygame.display.flip = function_intercept(pygame.display.flip, self._on_screen_update)
                 pygame.display.update = function_intercept(pygame.display.update, self._on_screen_update)
