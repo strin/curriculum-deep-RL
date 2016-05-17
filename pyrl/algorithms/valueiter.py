@@ -474,7 +474,7 @@ class DeepQlearn(object):
             else:
                 next_qvals = self.dqn.fprop(next_states)
 
-            use_DDQN = False
+            use_DDQN = True
             next_vs = np.zeros(self.minibatch_size).astype(floatX)
             if use_DDQN: # double DQN.
                 next_qvals_unfrozen = self.dqn.fprop(next_states)
