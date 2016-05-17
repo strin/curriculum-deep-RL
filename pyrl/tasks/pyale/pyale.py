@@ -144,7 +144,7 @@ class PygameSimulator(object):
                 self.learner.send_feedback(reward, curr_state, self.valid_actions, is_end)
             if is_end:
                 return
-
+            
             action = self.learner.get_action(curr_state, self.valid_actions)
             self.total_steps += 1
             self.last_action = action

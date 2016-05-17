@@ -42,7 +42,7 @@ class Game(object):
                 if not game_events:
                     game_events.append(event.Event(NOEVENT, {}))
                 for ev in game_events:
-                    if ev.type == QUIT: exit()
+                    if ev.type == QUIT: return
                     statuslevel = level.update()
                     Background.render()
                     bulletlayer.render()
@@ -62,10 +62,11 @@ class Game(object):
                     enemi.update()
                     bonus.update()
                     shotenemi.update()
+                    self.exploded = not statusship
+
                     if not any((statusship,explosion.status)):
                         Levelmess.update('Level Reloaded')
                         self.clear(level)
-                        self.exploded = True
                         display.update()
                         display.flip() # important for saving "exploded" information
                         return

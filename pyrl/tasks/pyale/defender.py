@@ -4,6 +4,8 @@ from pyrl.tasks.pyale import PygameSimulator, function_intercept
 from pyrl.evaluate import DrunkLearner
 from pygame.locals import *
 from pyrl.config import floatX
+from pyrl.utils import Timer
+import time
 import pygame
 
 _name = 'defender'
@@ -23,7 +25,7 @@ class DefenderSimulator(PygameSimulator):
 
     def is_end(self):
         game = self._get_attr('game')
-        return not game.levels
+        return not game.levels or game.exploded
 
 
     def get_score(self):
@@ -31,7 +33,7 @@ class DefenderSimulator(PygameSimulator):
         game = self._get_attr('game')
         exploded = int(game.exploded)
         level_cleared = int(not game.levels)
-        score = shot * 1 + exploded * -10. + level_cleared * 10.
+        score = shot * 0.1 + exploded * -1. + level_cleared * 1.
         return score
 
 
@@ -51,7 +53,7 @@ class DefenderRAMSimulator(DefenderSimulator):
         ram.extend([ship.topleft[0] / W, ship.topleft[1] / H,
                     (ship.topleft[0] + ship.rect.right - ship.rect.left) / W,
                     (ship.topleft[1] + ship.rect.top - ship.rect.bottom) / W])
-        C = 10
+        C = 20
         ram_enemi = np.zeros(2 * C) # at most handle 10 enemy ships.
         for (i, e) in enumerate(enemi[:C]):
             ram_enemi[i * 2] = e.top / H
@@ -63,9 +65,10 @@ class DefenderRAMSimulator(DefenderSimulator):
             ram_shotami[i * 2] = e.top / H
             ram_shotami[i * 2 + 1] = e.left / W
         ram.extend(list(ram_shotami))
-
-        ram_shotenemi = np.zeros(2 * C) # at most handle enemy 10 bullets.
-        for (i, e) in enumerate(shotenemi[:C]):
+        
+        AMIC = C
+        ram_shotenemi = np.zeros(2 * AMIC) # at most handle enemy 10 bullets.
+        for (i, e) in enumerate(shotenemi[:AMIC]):
             ram_shotenemi[i * 2] = e.top / H
             ram_shotenemi[i * 2 + 1] = e.left / W
         ram.extend(list(ram_shotenemi))
@@ -76,14 +79,32 @@ class DefenderRAMSimulator(DefenderSimulator):
 if __name__ == '__main__':
     # defender = DefenderSimulator(state_type='pixel')
     defender = DefenderRAMSimulator()
-    import os
-    os.environ.update({
-        'SHIELD_SHIP': '1',
-        'SHIELD_ENEMY': '30'
-    })
-    defender.run(DrunkLearner())
-    os.environ.update({
-        'SHIELD_SHIP': '1000',
-        'SHIELD_ENEMY': '30'
-    })
-    defender.run(DrunkLearner())
+
+    def test_environ():
+        import os
+        os.environ.update({
+            'SHIELD_SHIP': '1',
+            'SHIELD_ENEMY': '30'
+        })
+        defender.run(DrunkLearner())
+        os.environ.update({
+            'SHIELD_SHIP': '1000',
+            'SHIELD_ENEMY': '30'
+        })
+        defender.run(DrunkLearner())
+
+    def test_time():
+        for i in range(1):
+            start = time.time()
+            os.environ.update({
+                'SHIELD_SHIP': '1',
+                'SHIELD_ENEMY': '30'
+            })
+            defender.run(DrunkLearner())
+            end = time.time()
+            fps = defender.total_steps / (end - start)
+            print 'time', end - start, 'frame', defender.total_steps, 'fps', fps
+
+    test_time()
+
+

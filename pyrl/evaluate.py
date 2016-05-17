@@ -68,6 +68,7 @@ class DrunkLearner(object):
 
 
     def send_feedback(self, reward, next_state, next_valid_actions, is_end):
+        #print 'reward', reward, 'is_end', is_end
         self.cum_reward += reward
 
 
