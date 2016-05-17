@@ -168,6 +168,7 @@ def import_submodule(mod, subname, fullname):
     if fullname in found_now and fullname in sys.modules:
         m = sys.modules[fullname]
     else:
+        # print('Reloading', fullname)
         found_now[fullname] = 1
         oldm = sys.modules.get(fullname, None)
 
