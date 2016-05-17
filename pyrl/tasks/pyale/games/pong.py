@@ -26,6 +26,7 @@ pygame.display.set_caption("Pong Pong!")
 screen=pygame.display.set_mode((640,480),0,32)
 
 W = 20
+# the actual paddle size.
 try:
     H1 = int(os.environ['H1'])
 except:
@@ -34,6 +35,20 @@ try:
     H2 = int(os.environ['H2'])
 except:
     H2 = 50
+
+# the paddle size that appears. (some might be hidden!)
+# sometimes we might want to keep VH same across tasks.
+# so we don't get wierd extrapolation effect.
+try:
+    VH1 = int(os.environ['VH1'])
+except:
+    VH1 = H1
+
+try:
+    VH2 = int(os.environ['VH2'])
+except:
+    VH2 = H2
+
 C = 15
 show_score = False
 
@@ -43,9 +58,9 @@ width = 640
 back = pygame.Surface((width,height))
 background = back.convert()
 background.fill((144,72,17))
-bar1 = pygame.Surface((W,H1)).convert()
+bar1 = pygame.Surface((W,VH1)).convert()
 bar1.fill((101, 213, 77))
-bar2 = pygame.Surface((W,H2)).convert()
+bar2 = pygame.Surface((W,VH2)).convert()
 bar2.fill((213, 130, 74))
 circ_sur = pygame.Surface((C,C))
 # circ = pygame.draw.circle(circ_sur,(0,255,0),(C/2,C/2),C/2) # circle shape
