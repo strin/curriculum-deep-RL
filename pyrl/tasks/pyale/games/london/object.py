@@ -387,6 +387,11 @@ class Bullet(pygame.sprite.Sprite):
 		self.add(data.destroyableEntities)  # explode bombs it comes into contact with
 
 		self.image = Bullet.image
+                self.baseImageSize = self.image.get_size()
+                bullet_size = int(get_val(os.environ, 'BULLET', 1.))
+                self.image = pygame.transform.scale(self.image,
+                        (self.baseImageSize[0] * bullet_size, 
+                         self.baseImageSize[1] * bullet_size))
 		self.rect = self.image.get_rect(center=pos)
 		self.coords = [float(self.rect.centerx), float(self.rect.centery)]
 		self.angle = self.get_angle(pos, aimAt)

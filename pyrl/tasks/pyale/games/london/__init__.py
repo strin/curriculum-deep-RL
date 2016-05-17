@@ -19,7 +19,6 @@ class StateHandler:
 		self.gameHandler = None
 
 		sound.playMusic('assets/sounds/searching.mp3')   # courtesy of http://ericskiff.com/music/
-														 # released under CC Attribution license
 
 
 	def update(self):
@@ -30,7 +29,6 @@ class StateHandler:
 		# update game/menu objs
 		if self.gameHandler:
 			self.gameHandler.update(self.data, self.data.dt)
-		
 		else:
 			done = self.mainMenu.update(self.data)
 			if done:
@@ -48,7 +46,6 @@ class Data:
 
 		self.screen = pygame.display.set_mode((self.WINDOWWIDTH, self.WINDOWHEIGHT), 0, 32)
 		self.FPSClock = pygame.time.Clock()
-                print pygame.time.Clock()
 		self.FPS = 60
 		self.input = input.Input()
 		sound.muted = False
@@ -64,6 +61,9 @@ class Data:
 
 		self.scoreValues = {'shoot bomb': 20, 'shoot superBomb': 30, 'destroy bomber': 200}
                 self.score = 0
+
+		self.bombs = pygame.sprite.Group()
+		self.superBombs = pygame.sprite.Group()
 
 
 	def newGame(self):

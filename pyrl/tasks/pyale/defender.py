@@ -65,7 +65,7 @@ class DefenderRAMSimulator(DefenderSimulator):
             ram_shotami[i * 2] = e.top / H
             ram_shotami[i * 2 + 1] = e.left / W
         ram.extend(list(ram_shotami))
-        
+
         AMIC = C
         ram_shotenemi = np.zeros(2 * AMIC) # at most handle enemy 10 bullets.
         for (i, e) in enumerate(shotenemi[:AMIC]):

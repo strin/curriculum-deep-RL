@@ -67,9 +67,9 @@ class GameHandler:
 		if self.gameOver:
 			self.showGameOverOverlay(data)
 
-			if len(data.input.unpressedKeys) > 0:# start a new game if a or mouse button key is pressed
-				self.gameOver = False
-				self.newGame(data)
+			#if len(data.input.unpressedKeys) > 0:# start a new game if a or mouse button key is pressed
+			#	self.gameOver = False
+			#	self.newGame(data)
 
 
 	def newGame(self, data):
