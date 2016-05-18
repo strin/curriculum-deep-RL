@@ -8,7 +8,7 @@ from pyrl.utils import Timer
 from pyrl.tasks.task import Task
 from pyrl.agents.agent import DQN
 from pyrl.agents.agent import TabularVfunc
-from pyrl.config import floatX
+from pyrl.config import floatX, debug_flag
 
 class ValueIterationSolver(object):
     '''
@@ -300,7 +300,7 @@ class DeepQlearn(object):
     def __init__(self, dqn_mt, gamma=0.95, l2_reg=0.0, lr=1e-3,
                memory_size=250, minibatch_size=64,
                nn_num_batch=1, nn_num_iter=2, regularizer={},
-               target_freq=10, skip_frame=0,
+               update_freq=1, target_freq=10, skip_frame=0,
                frames_per_action=4,
                exploration_kwargs={
                    'method': 'eps-greedy',
@@ -317,6 +317,7 @@ class DeepQlearn(object):
         self.l2_reg = floatX(l2_reg)
         self.lr = floatX(lr)
         self.target_freq = target_freq
+        self.update_freq = update_freq
         self.memory_size = memory_size
         self.minibatch_size = minibatch_size
         self.gamma = floatX(gamma)
@@ -435,6 +436,8 @@ class DeepQlearn(object):
         # removing this might cause correlation for early samples. suggested to be used in curriculums.
         if self.total_exp < self.skip_frame:
             return
+        if self.total_exp % self.update_freq:
+            return
         #if len(self.experience) < self.memory_size:
         #    return
         for nn_bi in range(self.nn_num_batch):
@@ -474,7 +477,7 @@ class DeepQlearn(object):
             else:
                 next_qvals = self.dqn.fprop(next_states)
 
-            use_DDQN = True
+            use_DDQN = False
             next_vs = np.zeros(self.minibatch_size).astype(floatX)
             if use_DDQN: # double DQN.
                 next_qvals_unfrozen = self.dqn.fprop(next_states)
@@ -517,18 +520,18 @@ class DeepQlearn(object):
             #print 'actions', actions
             nn_error = []
             for nn_it in range(self.nn_num_iter):
-                #if self.target_freq and self.total_exp % self.target_freq == 0:
-                #    print 'value before\n', self.dqn.fprop(states)[range(self.minibatch_size), actions]
+                if debug_flag and self.target_freq and self.total_exp % self.target_freq == 0:
+                    print 'value before\n', self.dqn.fprop(states)[range(self.minibatch_size), actions]
                 error = self.bprop(states, actions, targets.flatten(), *reg_vs)
-                #if self.target_freq and self.total_exp % self.target_freq == 0:
-                #    print 'nn_it', nn_it, 'error', error
-                #    print 'value after\n', self.dqn.fprop(states)[range(self.minibatch_size), actions]
-                #    print 'targets\n', targets
-                #    #print 'dqn vs\n', self.dqn.fprop(states)
-                #    #print 'dqn avs\n', dqn_avs
-                #    print 'next_qvals\n', next_qvals
-                #    print 'rewards', rewards
-                #    print 'total_exp', self.total_exp
+                if debug_flag and self.target_freq and self.total_exp % self.target_freq == 0:
+                    print 'nn_it', nn_it, 'error', error
+                    print 'value after\n', self.dqn.fprop(states)[range(self.minibatch_size), actions]
+                    print 'targets\n', targets
+                    #print 'dqn vs\n', self.dqn.fprop(states)
+                    #print 'dqn avs\n', dqn_avs
+                    print 'next_qvals\n', next_qvals
+                    print 'rewards', rewards
+                    print 'total_exp', self.total_exp
                 nn_error.append(float(error))
             self.diagnostics['nn-error'].append(nn_error)
 
