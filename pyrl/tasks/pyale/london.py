@@ -4,6 +4,7 @@ from pyrl.tasks.pyale import PygameSimulator, function_intercept
 from pyrl.evaluate import DrunkLearner
 from pygame.locals import *
 from pyrl.config import floatX
+import time
 import pygame
 
 _name = 'london'
@@ -78,7 +79,13 @@ if __name__ == '__main__':
         vr.write_frame(data)
     make_vr = lambda name: RawVideoRecorder(name, (600, 800))
     london = LondonRAMSimulator()
-    london.run(DrunkLearner(), callback=None)
+    start = time.time()
+    vr = make_vr('test.m4v')
+    london.run(DrunkLearner(), callback=callback)
+    vr.stop()
+    end = time.time()
+    fps = london.total_steps / (end - start)
+    print 'time', end - start, 'frame', london.total_steps, 'fps', fps
     print 'screen size', london.screen_size
     os.environ.update({
         'BULLET': '2'
