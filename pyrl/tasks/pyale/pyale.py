@@ -86,6 +86,8 @@ class PygameSimulator(object):
             return img / floatX(255.0)
         elif self.state_type == 'ram':
             return self._get_ram_state()
+        elif self.state_type == '1hot':
+            return self._get_1hot_state()
         else:
             raise NotImplementedError()
 
@@ -95,7 +97,10 @@ class PygameSimulator(object):
 
 
     def _get_state(self):
-        return np.array(self.frames)
+        if self.state_type == '1hot':
+            return np.concatenate(self.frames, axis=0)
+        else:
+            return np.array(self.frames)
 
     
     @property
@@ -227,8 +232,8 @@ class PygameSimulator(object):
         try:
             if self.game_module:
                 from pyrl.tasks.pyale.reload import reload
-                reload(self.game_module, exclude=['sys', 'os.path', 'builtins', '__main__', 'pygame', 'collections',
-                    'numpy', 'unittest'])
+                from pyrl.tasks.pyale.reload_exclude import reload_exclude
+                reload(self.game_module, exclude=reload_exclude)
             else:
                 pygame.display.flip = function_intercept(pygame.display.flip, self._on_screen_update)
                 pygame.display.update = function_intercept(pygame.display.update, self._on_screen_update)
