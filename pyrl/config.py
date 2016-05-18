@@ -9,3 +9,8 @@ if floatX_name and floatX_name == 'float64':
 else:
     floatX = np.float32
     theano.config.floatX = 'float32'
+
+try:
+    debug_flag = bool(os.environ['debug'])
+except:
+    debug_flag = False
