@@ -54,7 +54,7 @@ class Level1(object):
         return 1
             
             
-    v       = [v1,v2,wait]
+    v       = [v1,wait,v2,wait]
     
     @staticmethod
     def update():
@@ -64,7 +64,7 @@ class Level1(object):
         
     @staticmethod
     def clear():
-        Level1.v = [Level1.v1,Level1.v2,Level1.wait]
+        Level1.v = [Level1.v1, Level1.wait, Level1.v2,Level1.wait]
         Level1.count1  = 8
         Level1.count2  = 8
         Level1.t1      = 0

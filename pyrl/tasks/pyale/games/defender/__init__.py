@@ -15,8 +15,8 @@ from lib.bonus      import bonus
 
 enemi.shot = 0
 
-joystick.init()
-if joystick.get_count(): joystick.Joystick(0).init()
+#joystick.init()
+#if joystick.get_count(): joystick.Joystick(0).init()
     
 class Game(object):
     
