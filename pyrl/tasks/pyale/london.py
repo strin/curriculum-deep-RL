@@ -49,10 +49,12 @@ class LondonRAMSimulator(LondonSimulator):
         stateHandler = self._get_attr('stateHandler')
         bombs = stateHandler.data.bombs.sprites()
         superBombs = stateHandler.data.superBombs.sprites()
+        bullets = stateHandler.data.bullets.sprites()
         C = 10
         ram_bombs = np.zeros(2 * C) # at most handle 10 enemy items.
         ram_superBombs = np.zeros(2 * C)
-
+        ram_bullets = np.zeros(4 * C)
+        
         for (i, bomb) in enumerate(bombs[:C]):
             ram_bombs[i * 2] = bomb.rect[0] / W
             ram_bombs[i * 2 + 1] = bomb.rect[1] / H
@@ -61,14 +63,21 @@ class LondonRAMSimulator(LondonSimulator):
             ram_superBombs[i * 2] = superBomb.rect[0] / W
             ram_superBombs[i * 2 + 1] = superBomb.rect[1] / H
 
+        for (i, bullet) in enumerate(bullets[:C]):
+            ram_bullets[i * 4] = bullet.rect[0] / W
+            ram_bullets[i * 4 + 1] = (bullet.rect[0] + bullet.rect[2]) / W
+            ram_bullets[i * 4 + 2] = bullet.rect[1] / H
+            ram_bullets[i * 4 + 3] = (bullet.rect[1] + bullet.rect[3])/ H
+
         ram.extend(list(ram_bombs))
         ram.extend(list(ram_superBombs))
+        ram.extend(list(ram_bullets))
 
         return np.array(ram, dtype=floatX)
 
     @property
     def state_shape(self):
-        return self.num_frames * 40
+        return self.num_frames * 80
 
 
 if __name__ == '__main__':

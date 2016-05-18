@@ -64,6 +64,7 @@ class Data:
 
 		self.bombs = pygame.sprite.Group()
 		self.superBombs = pygame.sprite.Group()
+		self.bullets = pygame.sprite.Group()
 
 
 	def newGame(self):
@@ -89,7 +90,6 @@ class Data:
 		self.superBombs = pygame.sprite.Group()
 
 		self.AAguns = pygame.sprite.Group()
-		self.bullets = pygame.sprite.Group()
 
 		self.spotlights = pygame.sprite.Group()
 
