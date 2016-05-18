@@ -4,7 +4,8 @@ from pyrl.tasks.pyale import PygameSimulator, function_intercept
 from pyrl.evaluate import DrunkLearner
 from pygame.locals import *
 from pyrl.config import floatX
-from pyrl.utils import Timer
+from pyrl.utils import Timer, get_val
+import os
 import time
 import pygame
 
@@ -33,7 +34,8 @@ class DefenderSimulator(PygameSimulator):
         game = self._get_attr('game')
         exploded = int(game.exploded)
         level_cleared = int(not game.levels)
-        score = shot * 0.1 + exploded * -1. + level_cleared * 1.
+        SURVIVAL = (self.total_steps - exploded) * float(get_val(os.environ, 'SURVIVAL', '0.00')) 
+        score = shot * 0.1 + exploded * -1. + level_cleared * 1. + SURVIVAL
         return score
 
 

@@ -102,7 +102,7 @@ class PygameSimulator(object):
         else:
             return np.array(self.frames)
 
-    
+
     @property
     def screen_size(self):
         surface = pygame.display.get_surface()
